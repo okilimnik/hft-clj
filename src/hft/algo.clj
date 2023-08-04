@@ -21,7 +21,7 @@
   (when-not @ctx (init))
   (RandomForestModel/load (.sc @ctx) (str "models/" id)))
 
-(defn -main [& args]
+(defn start! []
   (when-not @ctx (init))
   (let [datapath "order-book.txt"
         data (-> (MLUtils/loadLibSVMFile (.sc @ctx) datapath) (.toJavaRDD))

@@ -6,7 +6,6 @@ pom.xml
 /.lein-env
 /checkouts
 /.env
-/target
 /.cpcache
 /.calva
 /.lsp
@@ -16,5 +15,5 @@ pom.xml
 .nrepl-port
 /.idea
 *.iml
-firebase.json
 order-book.txt
+.DS_Store

@@ -8,6 +8,7 @@
     [hft.scheduler :refer [make-job]]))
 
 (def ORDER-LIFE "1m")
+(def filename "order-book.txt")
 
 (defn enum-duration->ms [v]
   (case (keyword v)
@@ -15,7 +16,8 @@
 
 (defn enum-duration->cron-expr [v]
   (case (keyword v)
-    :1m "0 * * ? * *"))
+    :1m "0 * * ? * *"
+    :1h "30 0 * ? * *"))
 
 (defn ->libsvm [best-prices order-book]
   (->> (concat
@@ -33,14 +35,17 @@
 
 (defjob FetchOrderBook [_]
         (thread
-          (let [filename "order-book.txt"
-                best-prices (api/best-price!)
+          (let [best-prices (api/best-price!)
                 order-book (api/depth!)
                 row (->libsvm (<!! best-prices) (<!! order-book))
                 label (wait-for-label! ORDER-LIFE)
                 labeled-row (str label " " row)]
-            (spit filename (str labeled-row "\n") :append true)
-            (upload-file! filename filename))))
+            (spit filename (str labeled-row "\n") :append true))))
 
-(defn -main [& args]
-  (let [job (make-job FetchOrderBook (enum-duration->cron-expr ORDER-LIFE))]))
+(defjob UploadDataset [_]
+  (thread
+    (upload-file! filename filename)))
+
+(defn prepare! []
+  (make-job FetchOrderBook (enum-duration->cron-expr ORDER-LIFE))
+  (make-job UploadDataset (enum-duration->cron-expr "1h")))
