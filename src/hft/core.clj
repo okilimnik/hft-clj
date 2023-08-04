@@ -2,7 +2,6 @@
   (:gen-class)
   (:require
    [clojure.string :as str]
-   [clojure.core.async :refer [<!! chan]]
    [clojure.tools.cli :refer [parse-opts]]
    [hft.api :as binance]
    [hft.dataset :as dataset]))

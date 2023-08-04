@@ -2,8 +2,7 @@
   (:require
    [cheshire.core :refer [parse-string]]
    [clojure.core.async :refer [go]]
-   [clojure.edn :as edn]
-   [environ.core :refer [env]])
+   [clojure.edn :as edn])
   (:import
    [com.binance.connector.client.impl SpotClientImpl]))
 
