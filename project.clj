@@ -8,11 +8,10 @@
                  [org.clojure/tools.cli "1.0.219"]
                  [io.github.binance/binance-connector-java "3.0.0rc3"]
                  [cheshire/cheshire "5.11.0"]
-                 [org.apache.spark/spark-mllib_2.13 "3.4.1"]
+                 [metosin/malli "0.13.0"]
                  [clojurewerkz/quartzite "2.1.0"]
                  [org.clojure/tools.nrepl "0.2.13"]
-                 [com.google.firebase/firebase-admin "9.2.0"]
-                 #_[com.intel.analytics.zoo/analytics-zoo-bigdl_0.13.0-spark_3.0.0 "0.11.2"]]
+                 [com.google.cloud/google-cloud-storage "2.25.0"]]
   :main hft.core
   :target-path "target/%s"
   :uberjar-name "app.jar"

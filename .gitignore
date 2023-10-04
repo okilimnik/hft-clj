@@ -15,6 +15,5 @@ pom.xml
 /.idea
 *.iml
 binance.config.edn
-firebase.json
-order-book.txt
+gcloud.json
 .DS_Store

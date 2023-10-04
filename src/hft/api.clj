@@ -1,14 +1,13 @@
 (ns hft.api
-  (:require
-   [cheshire.core :refer [parse-string]]
-   [clojure.core.async :refer [go]]
-   [clojure.edn :as edn])
-  (:import
-   [com.binance.connector.client.impl SpotClientImpl]))
+  (:require [cheshire.core :refer [parse-string]]
+            [clojure.core.async :refer [go]]
+            [clojure.edn :as edn])
+  (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]))
 
-(def SYMBOL "BTCUSDT")
+(def SYMBOL "BTCTUSD")
 (def trade-client (atom nil))
 (def market-client (atom nil))
+(def ws-client (atom nil))
 
 #_(defn open-order! [params]
     (-> (.newOrder trade-client params)
@@ -17,12 +16,12 @@
 (defn init []
   (let [config (:prod (edn/read-string (slurp "binance.config.edn")))]
     (reset! trade-client (.createTrade (SpotClientImpl. (:apiKey config) (:secret config) (:url config))))
-    (reset! market-client (.createMarket (SpotClientImpl. (:url config))))))
+    (reset! market-client (.createMarket (SpotClientImpl. (:url config))))
+    (reset! ws-client (WebSocketStreamClientImpl.))))
 
-(defn depth! []
-  (go
-    (-> (.depth @market-client {"symbol" SYMBOL "limit" 5000})
-        (parse-string true))))
+(defn depth! [symbol]
+  (-> (.depth @market-client {"symbol" symbol "limit" 5000})
+      (parse-string true)))
 
 (defn trades! []
   (go

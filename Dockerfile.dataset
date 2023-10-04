@@ -1,9 +1,8 @@
 FROM amazoncorretto:20-alpine3.18
 COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
-COPY firebase.json ./
 CMD ["java", "-jar", "app.jar", "-d"]
 
 # docker build -f Dockerfile.ds -t neusa-ds .
-# docker tag neusa asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-ds:latest
+# docker tag neusa-ds asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-ds:latest
 # docker push asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-ds

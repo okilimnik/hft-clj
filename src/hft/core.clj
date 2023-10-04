@@ -8,7 +8,9 @@
 
 (def cli-options
   [["-d" "--dataset" "Prepare dataset"
-    :id :dataset]])
+    :id :dataset]
+   ["-a" "--alerts" "Run alerts"
+    :id :alerts]])
 
 (defn error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
