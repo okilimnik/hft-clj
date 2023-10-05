@@ -2,12 +2,13 @@
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.math :as math]
+            [clojure.core.async :refer [thread]]
+            [taoensso.timbre :as log]
+            [mikera.image.core :as i]
+            [mikera.image.colours :as c]
             [cheshire.core :refer [parse-string]]
             [hft.api :as api])
-  (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
-           [javax.imageio ImageIO]
-           [java.awt Image]
-           [java.awt.image BufferedImage WritableRaster]))
+  (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 60)
@@ -16,11 +17,13 @@
 (def api-stream-id (atom nil))
 
 (defn ->image
-  "int[] pixels - 1-dimensional Java array, which length is width * height * 4 (argb)"
-  [pixels width height]
-  (let [image (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
-        ^WritableRaster raster (.getData image)]
-    (.setPixels raster 0 0 ^int width ^int height (to-array pixels))
+  "int[] pixels - 1-dimensional Java array, which length is width * height"
+  [data width height]
+  (let [image (i/new-image width height)
+        pixels (i/get-pixels image)]
+    (dotimes [i (* width height)]
+      (aset pixels i (nth data i)))
+    (i/set-pixels image pixels)
     image))
 
 (defn add-price-level [min-price level-shift prices-map]
@@ -75,19 +78,19 @@
       (recur filtered-series))))
 
 #_(defn validate-series [series]
-  (let [ask-price-levels (->> (:asks series)
-                              (map (fn [entry] (:price-level (val entry))))
-                              set)
-        bid-price-levels (->> (:bids series)
-                              (map (fn [entry] (:price-level (val entry))))
-                              set)]
-    #_(when (seq (set/intersection ask-price-levels bid-price-levels))
-      (throw (ex-info "Ask and bid price levels intersect!" {:intersected-levels (set/intersection ask-price-levels bid-price-levels)
-                                                             :ask-price-levels ask-price-levels
-                                                             :bid-price-levels bid-price-levels})))
-    (try (m/validate Series series)
-         (catch Exception _e
-           (throw (ex-info "Series don't fit into the schema!" {:error (me/humanize (m/explain Series series))}))))))
+    (let [ask-price-levels (->> (:asks series)
+                                (map (fn [entry] (:price-level (val entry))))
+                                set)
+          bid-price-levels (->> (:bids series)
+                                (map (fn [entry] (:price-level (val entry))))
+                                set)]
+      #_(when (seq (set/intersection ask-price-levels bid-price-levels))
+          (throw (ex-info "Ask and bid price levels intersect!" {:intersected-levels (set/intersection ask-price-levels bid-price-levels)
+                                                                 :ask-price-levels ask-price-levels
+                                                                 :bid-price-levels bid-price-levels})))
+      (try (m/validate Series series)
+           (catch Exception _e
+             (throw (ex-info "Series don't fit into the schema!" {:error (me/humanize (m/explain Series series))}))))))
 
 (defn get-pixels [bid-qties ask-qties]
   (let [all-qties (concat (mapcat vals bid-qties)
@@ -97,21 +100,18 @@
         shift (/ (- max-qty min-qty) 255)]
     (vec
      (for [idx (range INPUT-SIZE)
-           level (range INPUT-SIZE)
-           rgb (range 3) ;; 0 - bid, 1 - ask, 2 - always zero
-           :let [qties (case rgb
-                         0 (nth bid-qties idx)
-                         1 (nth ask-qties idx)
-                         nil)]]
-       (if qties
-         (int (math/round (/ (get qties level) shift)))
-         0)))))
+           level (range INPUT-SIZE)]
+       (c/argb (math/round (/ (get (nth bid-qties idx) level) shift))
+               (math/round (/ (get (nth bid-qties idx) level) shift))
+               0
+               1)))))
 
 (defn create-input-image [order-book-series]
-  (let [[denoised-series bid-qties ask-qties] (denoise order-book-series)]
-    (let [pixels (get-pixels bid-qties ask-qties)
-          image (->image pixels INPUT-SIZE INPUT-SIZE)]
-      (ImageIO/write image "jpg" (io/file "./dataset/image.jpg"))))
+  (let [[denoised-series bid-qties ask-qties] (denoise order-book-series)
+        pixels (get-pixels bid-qties ask-qties)
+        image (->image pixels INPUT-SIZE INPUT-SIZE)]
+    (i/save image "./dataset/image.png")
+    (log/info "saved image"))
 
   #_(let [^BufferedImage image (ImageIO/read (io/file filepath))
           ^Image scaledImage (.getScaledInstance image 300 150 Image/SCALE_DEFAULT)]
@@ -162,7 +162,13 @@
   (when (> (:finalUpdateId event) (:lastUpdateId (last @states)))
     (swap! states (partial add-to-states event)))
   (when (= (count @states) STATES-MAX-SIZE)
-    (create-input-image @states)))
+    (log/info "going to save image")
+    (let [data @states]
+      (thread
+        (create-input-image data)))))
+
+(defn stop-preparation! []
+  (.closeConnection @api/ws-client @api-stream-id))
 
 (def on-order-book-change
   (reify WebSocketMessageCallback
@@ -170,12 +176,14 @@
       (let [event (parse-string json true)]
         (if (= (:e event) "depthUpdate")
           (try
+            (log/info "got input")
             (calc-new-state (-> event
                                 (set/rename-keys {:u :finalUpdateId
                                                   :b :bids
                                                   :a :asks})
                                 mapify-prices))
             (catch Exception e
+              (stop-preparation!)
               (prn e)
               (throw e)))
           (prn "ws event: " event))))))
@@ -183,9 +191,6 @@
 (defn prepare! []
   (reset! api-stream-id (.diffDepthStream @api/ws-client SYMBOL 1000 on-order-book-change)))
 
-(defn stop-preparation! []
-  (.closeConnection @api/ws-client @api-stream-id))
-
 ;(api/init)
-;(prepare!)
-;(stop-preparation!)
+(prepare!)
+(stop-preparation!)

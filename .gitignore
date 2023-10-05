@@ -17,3 +17,4 @@ pom.xml
 binance.config.edn
 gcloud.json
 .DS_Store
+/dataset
