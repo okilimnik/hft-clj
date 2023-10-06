@@ -16,13 +16,24 @@
 (def STATES-MAX-SIZE (+ INPUT-SIZE PREDICTION-HEAD))
 (def api-stream-id (atom nil))
 
+(def image-counter (atom 0))
+
 (defn ->image
   "int[] pixels - 1-dimensional Java array, which length is width * height"
-  [data width height]
-  (let [image (i/new-image width height)
+  [bid-qties ask-qties width height]
+  (let [all-qties (concat (mapcat vals bid-qties)
+                          (mapcat vals ask-qties))
+        max-qty (+ (apply max all-qties) 0.000001)
+        min-qty (apply min all-qties)
+        shift (/ (- max-qty min-qty) 255)
+        image (i/new-image width height)
         pixels (i/get-pixels image)]
-    (dotimes [i (* width height)]
-      (aset pixels i (nth data i)))
+    (dotimes [idx width]
+      (dotimes [level height]
+        (aset pixels (* idx level) (c/argb (math/round (/ (get (nth bid-qties idx) level) shift))
+                                           (math/round (/ (get (nth ask-qties idx) level) shift))
+                                           0
+                                           1))))
     (i/set-pixels image pixels)
     image))
 
@@ -50,7 +61,9 @@
                    (< qty 0.1))))
        (into {})))
 
-(defn denoise [series]
+(defn denoise 
+  "This function takes too long, like 4 seconds." 
+  [series]
   (let [all-prices (concat (mapcat (comp keys :bids) series)
                            (mapcat (comp keys :asks) series))
         max-price (+ (apply max all-prices) 0.000001)
@@ -92,30 +105,13 @@
            (catch Exception _e
              (throw (ex-info "Series don't fit into the schema!" {:error (me/humanize (m/explain Series series))}))))))
 
-(defn get-pixels [bid-qties ask-qties]
-  (let [all-qties (concat (mapcat vals bid-qties)
-                          (mapcat vals ask-qties))
-        max-qty (+ (apply max all-qties) 0.000001)
-        min-qty (apply min all-qties)
-        shift (/ (- max-qty min-qty) 255)]
-    (vec
-     (for [idx (range INPUT-SIZE)
-           level (range INPUT-SIZE)]
-       (c/argb (math/round (/ (get (nth bid-qties idx) level) shift))
-               (math/round (/ (get (nth bid-qties idx) level) shift))
-               0
-               1)))))
-
 (defn create-input-image [order-book-series]
-  (let [[denoised-series bid-qties ask-qties] (denoise order-book-series)
-        pixels (get-pixels bid-qties ask-qties)
-        image (->image pixels INPUT-SIZE INPUT-SIZE)]
-    (i/save image "./dataset/image.png")
-    (log/info "saved image"))
-
-  #_(let [^BufferedImage image (ImageIO/read (io/file filepath))
-          ^Image scaledImage (.getScaledInstance image 300 150 Image/SCALE_DEFAULT)]
-      (ImageIO/write ^BufferedImage (->buffered-image scaledImage) "jpg" (io/file filepath))))
+  (let [[denoised-series bid-qties ask-qties] (time (denoise order-book-series))
+        image (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)
+        dir (io/file "./dataset")]
+    (when-not (.exists dir)
+      (.mkdirs dir))
+    (i/save image (str "./dataset/image_" (swap! image-counter inc) " .png"))))
 
 (defn states-validator [states]
   (or (empty? states)
@@ -162,10 +158,8 @@
   (when (> (:finalUpdateId event) (:lastUpdateId (last @states)))
     (swap! states (partial add-to-states event)))
   (when (= (count @states) STATES-MAX-SIZE)
-    (log/info "going to save image")
     (let [data @states]
-      (thread
-        (create-input-image data)))))
+      (create-input-image data))))
 
 (defn stop-preparation! []
   (.closeConnection @api/ws-client @api-stream-id))
@@ -176,7 +170,6 @@
       (let [event (parse-string json true)]
         (if (= (:e event) "depthUpdate")
           (try
-            (log/info "got input")
             (calc-new-state (-> event
                                 (set/rename-keys {:u :finalUpdateId
                                                   :b :bids
