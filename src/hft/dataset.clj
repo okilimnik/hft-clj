@@ -1,12 +1,13 @@
 (ns hft.dataset
-  (:require [clojure.java.io :as io]
-            [clojure.set :as set]
+  (:require [cheshire.core :refer [parse-string]]
+            [clojure.core.async :refer [thread]]
+            [clojure.java.io :as io]
             [clojure.math :as math]
-            [taoensso.timbre :as log]
-            [mikera.image.core :as i]
+            [clojure.set :as set]
+            [hft.api :as api]
             [mikera.image.colours :as c]
-            [cheshire.core :refer [parse-string]]
-            [hft.api :as api])
+            [mikera.image.core :as i]
+            [taoensso.timbre :as log])
   (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
 
 (def SYMBOL "BTCUSDT")
@@ -26,14 +27,17 @@
                           (mapcat vals ask-qties))
         max-qty (+ (apply max all-qties) 0.000001)
         min-qty (apply min all-qties)
-        shift (/ (- max-qty min-qty) 255)
+        _ (prn "max-qty: " max-qty)
+        _ (prn "min-qty: " min-qty)
+        shift (/ (- max-qty min-qty) 100.0)
         image (i/new-image width height)
         pixels (i/get-pixels image)]
     (dotimes [idx width]
       (dotimes [level height]
+        ;(spit "./pixels.txt" (str "\n" (/ (get (nth bid-qties idx) level 0) shift)) :append true)
         (aset pixels (* idx level) (let [pixel (c/argb
-                                                (math/round (/ (get (nth bid-qties idx) level 0) shift))
-                                                (math/round (/ (get (nth ask-qties idx) level 0) shift))
+                                                (/ (get (nth bid-qties idx) level 0) shift)
+                                                (/ (get (nth ask-qties idx) level 0) shift)
                                                 0
                                                 1)]
                                      pixel))))
@@ -96,8 +100,8 @@
                                (update :bids #(remove-low-qty % (nth bid-quantities-by-price-level idx)))
                                (update :asks #(remove-low-qty % (nth ask-quantities-by-price-level idx)))))
                          enriched-series)
-        all-prices (concat (mapcat (comp keys :bids) series)
-                           (mapcat (comp keys :asks) series))
+        all-prices (concat (mapcat (comp keys :bids) filtered-series)
+                           (mapcat (comp keys :asks) filtered-series))
         new-max-price (+ (apply max all-prices) 0.000001)
         new-min-price (apply min all-prices)]
     (if (and (= new-max-price max-price)
@@ -169,8 +173,7 @@
                                    (str %1 "1")
                                    (str %1 "0")) "" (reverse (range 1 5)))
           label (str bearish_label bullish_label)]
-      (when-not (= label "00000000")
-        label))))
+      label)))
 
 (defn create-input-image [series]
   (let [all-prices (concat (mapcat (comp keys :bids) series)
@@ -220,15 +223,17 @@
                            mapify-prices)))
   (when (> (:lastUpdateId event) (:lastUpdateId (last @states)))
     (swap! states #(add-to-states % event)))
-  (when (= (count @states) STATES-MAX-SIZE)
-    (let [image (create-input-image (take INPUT-SIZE @states))
-          label (calc-label (nth @states (dec INPUT-SIZE)) (drop INPUT-SIZE @states))
-          dir (io/file "./dataset")]
-      (when label
-        (when-not (.exists dir)
-          (.mkdirs dir))
-        (i/save image (str "./dataset/" label "_" (swap! image-counter inc) " .png"))
-        (log/info "saved input image")))))
+  (let [snapshot @states]
+    (when (= (count snapshot) STATES-MAX-SIZE)
+      (thread
+        (let [image (create-input-image (take INPUT-SIZE snapshot))
+              label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))
+              dir (io/file "./dataset")]
+          (when (= label "00000000")
+            (when-not (.exists dir)
+              (.mkdirs dir))
+            (i/save image (str "./dataset/" label "_" (swap! image-counter inc) " .png"))
+            (log/info "saved input image")))))))
 
 (defn stop-preparation! []
   (.closeConnection @api/ws-client @api-stream-id))
