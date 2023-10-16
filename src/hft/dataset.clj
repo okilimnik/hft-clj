@@ -12,6 +12,8 @@
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 60)
 (def PREDICTION-HEAD 10)
+(def LEVEL-PRICE-CHANGE-PERCENT 0.04)
+(def BTC-TRADING-AMOUNT 0.02)
 (def STATES-MAX-SIZE (+ INPUT-SIZE PREDICTION-HEAD))
 (def api-stream-id (atom nil))
 (def image-counter (atom 0))
@@ -103,18 +105,80 @@
       [bid-quantities-by-price-level ask-quantities-by-price-level]
       (recur filtered-series new-max-price new-min-price))))
 
+(defn calc-change-level [current next]
+  (let [shift (abs (- next current))
+        change-level (math/floor (/ (* shift 100.0) (* current LEVEL-PRICE-CHANGE-PERCENT)))]
+    (if (> change-level 4)
+      4
+      change-level)))
+
+(defn get-current-buy-price [state]
+  (->> state
+       :asks
+       (.keySet)
+       (filter #(let [qty (get-in state [:asks % :qty])]
+                  (> qty BTC-TRADING-AMOUNT)))
+       (apply min)))
+
+(defn get-next-sell-price [states]
+  (apply max
+         (for [state states]
+           (->> state
+                :bids
+                (.keySet)
+                (filter #(let [qty (get-in state [:bids % :qty])]
+                           (> qty BTC-TRADING-AMOUNT)))
+                (apply max)))))
+
+(defn get-current-sell-price [state]
+  (->> state
+       :bids
+       (.keySet)
+       (filter #(let [qty (get-in state [:bids % :qty])]
+                  (> qty BTC-TRADING-AMOUNT)))
+       (apply max)))
+
+(defn get-next-buy-price [states]
+  (apply min
+         (for [state states]
+           (->> state
+                :asks
+                (.keySet)
+                (filter #(let [qty (get-in state [:asks % :qty])]
+                           (> qty BTC-TRADING-AMOUNT)))
+                (apply min)))))
+
+(defn calc-label [current-state next-states]
+  (let [current-buy-price (get-current-buy-price current-state)
+        next-sell-price (get-next-sell-price next-states)
+        current-sell-price (get-current-sell-price current-state)
+        next-buy-price (get-next-buy-price next-states)
+        bullish-change-level (atom 0)
+        bearish-change-level (atom 0)]
+    (when (> next-sell-price current-buy-price)
+      (reset! bullish-change-level (calc-change-level current-buy-price next-sell-price)))
+    (when (< next-buy-price current-sell-price)
+      (reset! bearish-change-level (calc-change-level current-sell-price next-buy-price)))
+    (when (= @bullish-change-level @bearish-change-level)
+      (reset! bullish-change-level 0)
+      (reset! bearish-change-level 0))
+    (let [bullish_label (reduce #(if (= %2 @bullish-change-level)
+                                   (str %1 "1")
+                                   (str %1 "0")) "" (range 1 5))
+          bearish_label (reduce #(if (= %2 @bearish-change-level)
+                                   (str %1 "1")
+                                   (str %1 "0")) "" (reverse (range 1 5)))
+          label (str bearish_label bullish_label)]
+      (when-not (= label "00000000")
+        label))))
+
 (defn create-input-image [series]
   (let [all-prices (concat (mapcat (comp keys :bids) series)
                            (mapcat (comp keys :asks) series))
         max-price (+ (apply max all-prices) 0.000001)
         min-price (apply min all-prices)
-        [bid-qties ask-qties] (time (denoise series max-price min-price))
-        image (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)
-        dir (io/file "./dataset")]
-    (when-not (.exists dir)
-      (.mkdirs dir))
-    (i/save image (str "./dataset/image_" (swap! image-counter inc) " .png"))
-    (log/info "saved input image")))
+        [bid-qties ask-qties] (time (denoise series max-price min-price))]
+    (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)))
 
 (defn mapify-prices [order-book]
   (-> order-book
@@ -157,7 +221,14 @@
   (when (> (:lastUpdateId event) (:lastUpdateId (last @states)))
     (swap! states #(add-to-states % event)))
   (when (= (count @states) STATES-MAX-SIZE)
-    (create-input-image @states)))
+    (let [image (create-input-image (take INPUT-SIZE @states))
+          label (calc-label (nth @states (dec INPUT-SIZE)) (drop INPUT-SIZE @states))
+          dir (io/file "./dataset")]
+      (when label
+        (when-not (.exists dir)
+          (.mkdirs dir))
+        (i/save image (str "./dataset/" label "_" (swap! image-counter inc) " .png"))
+        (log/info "saved input image")))))
 
 (defn stop-preparation! []
   (.closeConnection @api/ws-client @api-stream-id))
