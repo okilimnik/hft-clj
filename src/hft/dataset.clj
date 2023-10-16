@@ -82,7 +82,7 @@
             (doseq [a (keys (:asks s))]
               (when (low-qty? a (nth ask-quantities-by-price-level idx))
                 (dissoc! (:asks s) a))))
-        all-prices (mapcat #(concat (keys (persistent! (:bids %))) (keys (persistent! (:asks %)))) series)
+        all-prices (map first (mapcat #(concat (:bids %) (:asks %)) series))
         new-max-price (+ (apply max all-prices) 0.000001)
         new-min-price (apply min all-prices)]
     (if (and (= new-max-price max-price)
@@ -91,7 +91,7 @@
       (recur series new-max-price new-min-price))))
 
 (defn create-input-image [order-book-series]
-  (let [all-prices (mapcat #(concat (keys (persistent! (:bids %))) (keys (persistent! (:asks %)))) order-book-series)
+  (let [all-prices (map first (mapcat #(concat (:bids %) (:asks %)) order-book-series))
         max-price (+ (apply max all-prices) 0.000001)
         min-price (apply min all-prices)
         [bid-qties ask-qties] (time (denoise order-book-series max-price min-price))
