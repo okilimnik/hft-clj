@@ -19,28 +19,29 @@
 (def api-stream-id (atom nil))
 (def image-counter (atom 0))
 (def states (atom []))
+(def MAX-PRICE-INTERVAL-ADDITION 0.000001)
+(def QUANTITY-THRESHOLD 0.5)
 
 (defn ->image
   "int[] pixels - 1-dimensional Java array, which length is width * height"
   [bid-qties ask-qties width height]
   (let [all-qties (concat (mapcat vals bid-qties)
                           (mapcat vals ask-qties))
-        max-qty (+ (apply max all-qties) 0.000001)
+        max-qty (+ (apply max all-qties) MAX-PRICE-INTERVAL-ADDITION)
         min-qty (apply min all-qties)
         _ (prn "max-qty: " max-qty)
         _ (prn "min-qty: " min-qty)
-        shift (/ (- max-qty min-qty) 100.0)
+        shift (- max-qty min-qty)
         image (i/new-image width height)
         pixels (i/get-pixels image)]
     (dotimes [idx width]
       (dotimes [level height]
-        ;(spit "./pixels.txt" (str "\n" (/ (get (nth bid-qties idx) level 0) shift)) :append true)
-        (aset pixels (* idx level) (let [pixel (c/argb
-                                                (/ (get (nth bid-qties idx) level 0) shift)
-                                                (/ (get (nth ask-qties idx) level 0) shift)
-                                                0
-                                                1)]
-                                     pixel))))
+        (aset pixels (* idx level)
+              (c/argb
+               (/ (- (get (nth bid-qties idx) level) min-qty) shift)
+               (/ (- (get (nth ask-qties idx) level) min-qty) shift)
+               0.0
+               1.0))))
     (i/set-pixels image pixels)
     image))
 
@@ -48,46 +49,52 @@
   (persistent!
    (reduce (fn [out k]
              (let [v (get out k)]
-               (assoc! out k (assoc v :price-level (int (/ (- k min-price) level-shift))))))
+               (assoc! out k (assoc v :price-level (int (/ (- (parse-double k) min-price) level-shift))))))
            (transient m)
            (.keySet m))))
-
-(def PRICE-LEVELS
-  (->> (for [i (range INPUT-SIZE)]
-         [i 0])
-       (into {})))
 
 (defn calc-quantities-by-price-level [m]
   (persistent!
    (reduce (fn [out k]
              (let [v (get m k)
                    level (:price-level v)]
-               (assoc! out level (+ (get out level) (:qty v)))))
-           (transient PRICE-LEVELS)
+               (assoc! out level (+ (get out level 0) (:qty v)))))
+           (transient {})
            (.keySet m))))
 
-(defn remove-low-qty [m quantities-by-price-level]
+(defn remove-low-qty [m quantities-by-price-level threshold]
   (persistent!
    (reduce (fn [out k]
              (let [v (get m k)
                    level (:price-level v)
                    qty (get quantities-by-price-level level)]
-               (if (< qty 0.5)
+               (if (< qty threshold)
                  (dissoc! out k)
                  out)))
            (transient m)
            (.keySet m))))
 
-(defn denoise
-  "This function takes too long, like 4 seconds."
-  [series max-price min-price]
+(defn get-price-extremums [series]
+  (let [prices (concat (mapcat (comp keys :bids) series)
+                       (mapcat (comp keys :asks) series))
+        max-price (+ (parse-double (apply max-key parse-double prices)) MAX-PRICE-INTERVAL-ADDITION)
+        min-price (parse-double (apply min-key parse-double prices))]
+    [min-price max-price]))
+
+(defn format-float [price]
+  (format "%.6f" price))
+
+(defn add-price-levels [series min-price max-price]
   (let [shift (- max-price min-price)
-        level-shift (/ shift INPUT-SIZE)
-        enriched-series (map (fn [s]
-                               (-> s
-                                   (update :bids #(add-price-level % min-price level-shift))
-                                   (update :asks #(add-price-level % min-price level-shift))))
-                             series)
+        level-shift (/ shift INPUT-SIZE)]
+    (map (fn [s]
+           (-> s
+               (update :bids #(add-price-level % min-price level-shift))
+               (update :asks #(add-price-level % min-price level-shift))))
+         series)))
+
+(defn denoise [series min-price max-price]
+  (let [enriched-series (add-price-levels series min-price max-price)
         bid-quantities-by-price-level (map (fn [s]
                                              (calc-quantities-by-price-level (:bids s)))
                                            enriched-series)
@@ -97,17 +104,14 @@
         filtered-series (map-indexed
                          (fn [idx s]
                            (-> s
-                               (update :bids #(remove-low-qty % (nth bid-quantities-by-price-level idx)))
-                               (update :asks #(remove-low-qty % (nth ask-quantities-by-price-level idx)))))
+                               (update :bids #(remove-low-qty % (nth bid-quantities-by-price-level idx) QUANTITY-THRESHOLD))
+                               (update :asks #(remove-low-qty % (nth ask-quantities-by-price-level idx) QUANTITY-THRESHOLD))))
                          enriched-series)
-        all-prices (concat (mapcat (comp keys :bids) filtered-series)
-                           (mapcat (comp keys :asks) filtered-series))
-        new-max-price (+ (apply max all-prices) 0.000001)
-        new-min-price (apply min all-prices)]
-    (if (and (= new-max-price max-price)
-             (= new-min-price min-price))
+        [new-min-price new-max-price] (get-price-extremums filtered-series)]
+    (if (and (= (format-float new-max-price) (format-float max-price))
+             (= (format-float new-min-price) (format-float min-price)))
       [bid-quantities-by-price-level ask-quantities-by-price-level]
-      (recur filtered-series new-max-price new-min-price))))
+      (recur filtered-series new-min-price new-max-price))))
 
 (defn calc-change-level [current next]
   (let [shift (abs (- next current))
@@ -117,40 +121,44 @@
       change-level)))
 
 (defn get-current-buy-price [state]
-  (->> state
-       :asks
-       (.keySet)
-       (filter #(let [qty (get-in state [:asks % :qty])]
-                  (> qty BTC-TRADING-AMOUNT)))
-       (apply min)))
+  (parse-double
+   (->> state
+        :asks
+        (.keySet)
+        (filter #(let [qty (get-in state [:asks % :qty])]
+                   (> qty BTC-TRADING-AMOUNT)))
+        (apply min-key parse-double))))
 
 (defn get-next-sell-price [states]
-  (apply max
-         (for [state states]
-           (->> state
-                :bids
-                (.keySet)
-                (filter #(let [qty (get-in state [:bids % :qty])]
-                           (> qty BTC-TRADING-AMOUNT)))
-                (apply max)))))
+  (parse-double
+   (apply max-key parse-double
+          (for [state states]
+            (->> state
+                 :bids
+                 (.keySet)
+                 (filter #(let [qty (get-in state [:bids % :qty])]
+                            (> qty BTC-TRADING-AMOUNT)))
+                 (apply max-key parse-double))))))
 
 (defn get-current-sell-price [state]
-  (->> state
-       :bids
-       (.keySet)
-       (filter #(let [qty (get-in state [:bids % :qty])]
-                  (> qty BTC-TRADING-AMOUNT)))
-       (apply max)))
+  (parse-double
+   (->> state
+        :bids
+        (.keySet)
+        (filter #(let [qty (get-in state [:bids % :qty])]
+                   (> qty BTC-TRADING-AMOUNT)))
+        (apply max-key parse-double))))
 
 (defn get-next-buy-price [states]
-  (apply min
-         (for [state states]
-           (->> state
-                :asks
-                (.keySet)
-                (filter #(let [qty (get-in state [:asks % :qty])]
-                           (> qty BTC-TRADING-AMOUNT)))
-                (apply min)))))
+  (parse-double
+   (apply min-key parse-double
+          (for [state states]
+            (->> state
+                 :asks
+                 (.keySet)
+                 (filter #(let [qty (get-in state [:asks % :qty])]
+                            (> qty BTC-TRADING-AMOUNT)))
+                 (apply min-key parse-double))))))
 
 (defn calc-label [current-state next-states]
   (let [current-buy-price (get-current-buy-price current-state)
@@ -176,22 +184,19 @@
       label)))
 
 (defn create-input-image [series]
-  (let [all-prices (concat (mapcat (comp keys :bids) series)
-                           (mapcat (comp keys :asks) series))
-        max-price (+ (apply max all-prices) 0.000001)
-        min-price (apply min all-prices)
-        [bid-qties ask-qties] (time (denoise series max-price min-price))]
+  (let [[min-price max-price] (get-price-extremums series)
+        [bid-qties ask-qties] (time (denoise series min-price max-price))]
     (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)))
 
 (defn mapify-prices [order-book]
   (-> order-book
       (update :bids (fn [bids] (->> bids
                                     (mapv (fn [[price qty]]
-                                            [(parse-double price) {:qty (parse-double qty)}]))
+                                            [price {:qty (parse-double qty)}]))
                                     (into {}))))
       (update :asks (fn [asks] (->> asks
                                     (mapv (fn [[price qty]]
-                                            [(parse-double price) {:qty (parse-double qty)}]))
+                                            [price {:qty (parse-double qty)}]))
                                     (into {}))))))
 
 (defn filter-pos-qty [m]
@@ -240,6 +245,7 @@
 
 (defn event->readable-event [event]
   (-> event
+      (select-keys [:u :b :a])
       (set/rename-keys {:u :lastUpdateId
                         :b :bids
                         :a :asks})
