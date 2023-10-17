@@ -5,10 +5,10 @@
             [clojure.math :as math]
             [clojure.set :as set]
             [hft.api :as api]
-            [mikera.image.colours :as c]
             [mikera.image.core :as i]
             [taoensso.timbre :as log])
-  (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
+  (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
+           [java.awt Color]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 60)
@@ -32,18 +32,17 @@
                           (mapcat vals ask-qties))
         max-qty (+ (apply max all-qties) MAX-PRICE-INTERVAL-ADDITION)
         min-qty (apply min all-qties)
-        shift (- max-qty min-qty)
+        shift (/ (- max-qty min-qty) 255)
         image (i/new-image width height)
         pixels (i/get-pixels image)]
     (dotimes [idx (* width height)]
       (let [level (int (/ idx width))
             series-idx (mod idx width)]
         (aset pixels idx
-              (c/argb
-               (/ (- (get (nth bid-qties series-idx) level min-qty) min-qty) shift)
-               (/ (- (get (nth ask-qties series-idx) level min-qty) min-qty) shift)
-               0.5
-               1.0))))
+              (.getRGB (Color.
+                        (long (/ (- (get (nth bid-qties series-idx) level min-qty) min-qty) shift))
+                        (long (/ (- (get (nth ask-qties series-idx) level min-qty) min-qty) shift))
+                        (long 0))))))
     (i/set-pixels image pixels)
     image))
 
