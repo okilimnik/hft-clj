@@ -1,8 +1,0 @@
-FROM amazoncorretto:20-alpine3.18
-COPY target/uberjar/app.jar ./
-COPY binance.config.edn ./
-CMD ["java", "-jar", "app.jar", "-a"]
-
-# docker build -f Dockerfile.alerts -t neusa-alerts .
-# docker tag neusa-alerts asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-alerts:latest
-# docker push asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-alerts

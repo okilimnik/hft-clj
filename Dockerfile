@@ -1,4 +1,4 @@
-FROM amazoncorretto:20-alpine3.18
+FROM ghcr.io/graalvm/jdk-community:latest
 COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
 CMD ["java", "-jar", "app.jar", "-d"]
