@@ -22,6 +22,9 @@
 (def MAX-PRICE-INTERVAL-ADDITION 0.000001)
 (def QUANTITY-THRESHOLD 0.5)
 
+(defn stop-preparation! []
+  (.closeConnection @api/ws-client @api-stream-id))
+
 (defn ->image
   "int[] pixels - 1-dimensional Java array, which length is width * height"
   [bid-qties ask-qties width height]
@@ -29,18 +32,17 @@
                           (mapcat vals ask-qties))
         max-qty (+ (apply max all-qties) MAX-PRICE-INTERVAL-ADDITION)
         min-qty (apply min all-qties)
-        _ (prn "max-qty: " max-qty)
-        _ (prn "min-qty: " min-qty)
         shift (- max-qty min-qty)
         image (i/new-image width height)
         pixels (i/get-pixels image)]
-    (dotimes [idx width]
-      (dotimes [level height]
-        (aset pixels (* idx level)
+    (dotimes [idx (* width height)]
+      (let [level (int (/ idx width))
+            series-idx (mod idx width)]
+        (aset pixels idx
               (c/argb
-               (/ (- (get (nth bid-qties idx) level) min-qty) shift)
-               (/ (- (get (nth ask-qties idx) level) min-qty) shift)
-               0.0
+               (/ (- (get (nth bid-qties series-idx) level min-qty) min-qty) shift)
+               (/ (- (get (nth ask-qties series-idx) level min-qty) min-qty) shift)
+               0.5
                1.0))))
     (i/set-pixels image pixels)
     image))
@@ -54,20 +56,29 @@
            (.keySet m))))
 
 (defn calc-quantities-by-price-level [m]
-  (persistent!
-   (reduce (fn [out k]
-             (let [v (get m k)
-                   level (:price-level v)]
-               (assoc! out level (+ (get out level 0) (:qty v)))))
-           (transient {})
-           (.keySet m))))
+  (let [unfiltered (persistent!
+                    (reduce (fn [out k]
+                              (let [v (get m k)
+                                    level (:price-level v)]
+                                (assoc! out level (+ (get out level 0) (:qty v)))))
+                            (transient {})
+                            (.keySet m)))]
+    unfiltered
+    #_(persistent!
+       (reduce (fn [out level]
+                 (let [qty (get out level 0)]
+                   (if (< qty QUANTITY-THRESHOLD)
+                     (dissoc! out level)
+                     out)))
+               (transient unfiltered)
+               (.keySet unfiltered)))))
 
 (defn remove-low-qty [m quantities-by-price-level threshold]
   (persistent!
    (reduce (fn [out k]
              (let [v (get m k)
                    level (:price-level v)
-                   qty (get quantities-by-price-level level)]
+                   qty (get quantities-by-price-level level 0)]
                (if (< qty threshold)
                  (dissoc! out k)
                  out)))
@@ -231,17 +242,18 @@
   (let [snapshot @states]
     (when (= (count snapshot) STATES-MAX-SIZE)
       (thread
-        (let [image (create-input-image (take INPUT-SIZE snapshot))
-              label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))
-              dir (io/file "./dataset")]
-          (when (= label "00000000")
-            (when-not (.exists dir)
-              (.mkdirs dir))
-            (i/save image (str "./dataset/" label "_" (swap! image-counter inc) " .png"))
-            (log/info "saved input image")))))))
-
-(defn stop-preparation! []
-  (.closeConnection @api/ws-client @api-stream-id))
+        (try
+          (let [image (create-input-image (take INPUT-SIZE snapshot))
+                label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))
+                dir (io/file "./dataset")]
+            (when (= label "00000000")
+              (when-not (.exists dir)
+                (.mkdirs dir))
+              (i/save image (str "./dataset/" label "_" (swap! image-counter inc) " .png"))
+              (log/info "saved input image")))
+          (catch Exception e
+            (stop-preparation!)
+            (prn e)))))))
 
 (defn event->readable-event [event]
   (-> event
@@ -260,13 +272,12 @@
             (calc-new-state (event->readable-event event))
             (catch Exception e
               (stop-preparation!)
-              (prn e)
-              (throw e)))
+              (prn e)))
           (prn "ws event: " event))))))
 
 (defn prepare! []
   (reset! api-stream-id (.diffDepthStream @api/ws-client SYMBOL 1000 on-order-book-change)))
 
 ;(api/init)
-;(prepare!)
-;(stop-preparation!)
+(prepare!)
+(stop-preparation!)
