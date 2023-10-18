@@ -196,7 +196,7 @@
 
 (defn create-input-image [series]
   (let [[min-price max-price] (get-price-extremums series)
-        [bid-qties ask-qties] (denoise series min-price max-price)]
+        [bid-qties ask-qties] (time (denoise series min-price max-price))]
     (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)))
 
 (defn mapify-prices [order-book]
