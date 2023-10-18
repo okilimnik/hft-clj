@@ -14,7 +14,7 @@
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 60)
 (def PREDICTION-HEAD 10)
-(def LEVEL-PRICE-CHANGE-PERCENT 0.04)
+(def LEVEL-PRICE-CHANGE-PERCENT 0.02)
 (def BTC-TRADING-AMOUNT 0.02)
 (def STATES-MAX-SIZE (+ INPUT-SIZE PREDICTION-HEAD))
 (def api-stream-id (atom nil))
@@ -126,7 +126,7 @@
 
 (defn calc-change-level [current next]
   (let [shift (abs (- next current))
-        change-level (math/floor (/ (* shift 100.0) (* current LEVEL-PRICE-CHANGE-PERCENT)))]
+        change-level (int (math/floor (/ (* shift 100.0) (* current LEVEL-PRICE-CHANGE-PERCENT))))]
     (if (> change-level 4)
       4
       change-level)))
@@ -190,9 +190,8 @@
                                    (str %1 "0")) "" (range 1 5))
           bearish_label (reduce #(if (= %2 @bearish-change-level)
                                    (str %1 "1")
-                                   (str %1 "0")) "" (reverse (range 1 5)))
-          label (str bearish_label bullish_label)]
-      label)))
+                                   (str %1 "0")) "" (reverse (range 1 5)))]
+      (str bearish_label bullish_label))))
 
 (defn create-input-image [series]
   (let [[min-price max-price] (get-price-extremums series)

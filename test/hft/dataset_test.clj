@@ -116,3 +116,9 @@
           (/ (- (+ max-price-in-map sut/MAX-PRICE-INTERVAL-ADDITION)
                 min-price-in-map) 
              sut/INPUT-SIZE))))))
+
+(deftest calc-change-level-test 
+  (with-redefs [sut/LEVEL-PRICE-CHANGE-PERCENT 0.04]
+    (is (= 0 (sut/calc-change-level 28342.06 28335.01)))
+    (is (= 1 (sut/calc-change-level 28335.01 28350.06)))
+    (is (= 4 (sut/calc-change-level 28335.01 28385.06)))))
