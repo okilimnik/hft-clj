@@ -3,6 +3,6 @@ COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
 CMD ["java", "-jar", "app.jar", "-d"]
 
-# docker build -f Dockerfile.ds -t neusa-ds .
-# docker tag neusa-ds asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-ds:latest
-# docker push asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-ds
+# docker build -t neusa .
+# docker tag neusa asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest
+# docker push asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft

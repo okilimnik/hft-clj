@@ -6,7 +6,8 @@
             [clojure.set :as set]
             [hft.api :as api]
             [mikera.image.core :as i]
-            [taoensso.timbre :as log])
+            [taoensso.timbre :as log]
+            [hft.gcloud :refer [upload-file!]])
   (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
            [java.awt Color]))
 
@@ -195,7 +196,7 @@
 
 (defn create-input-image [series]
   (let [[min-price max-price] (get-price-extremums series)
-        [bid-qties ask-qties] (time (denoise series min-price max-price))]
+        [bid-qties ask-qties] (denoise series min-price max-price)]
     (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)))
 
 (defn mapify-prices [order-book]
@@ -245,11 +246,14 @@
           (let [image (create-input-image (take INPUT-SIZE snapshot))
                 label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))
                 dir (io/file "./dataset")]
-            (when (= label "00000000")
+            (when (not= label "00000000")
               (when-not (.exists dir)
                 (.mkdirs dir))
-              (i/save image (str "./dataset/" label "_" (swap! image-counter inc) " .png"))
-              (log/info "saved input image")))
+              (let [filename (str label "_" (swap! image-counter inc) " .png")
+                    filepath (str "./dataset/" filename)]
+                (i/save image filepath)
+                (upload-file! filename filepath)
+                (io/delete-file filepath))))
           (catch Exception e
             (stop-preparation!)
             (prn e)))))))
@@ -278,5 +282,5 @@
   (reset! api-stream-id (.diffDepthStream @api/ws-client SYMBOL 1000 on-order-book-change)))
 
 ;(api/init)
-(prepare!)
-(stop-preparation!)
+;(prepare!)
+;(stop-preparation!)
