@@ -1,7 +1,6 @@
 (ns hft.open-order
-  (:require
-   [clojure.string :as str]
-   [hft.api :as api]))
+  (:require [clojure.string :as str]
+            [hft.api :as api]))
 
 ;; we want our order not to match any existent order
 ;; so it would be a `maker` order (less exchange fee + more profit by default)

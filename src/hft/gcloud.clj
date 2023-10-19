@@ -1,8 +1,6 @@
 (ns hft.gcloud
-  (:require
-   [clojure.java.io :as io])
-  (:import
-    [com.google.cloud.storage BlobId BlobInfo StorageOptions Storage$BlobWriteOption]))
+  (:require [clojure.java.io :as io])
+  (:import [com.google.cloud.storage BlobId BlobInfo StorageOptions Storage$BlobWriteOption]))
 
 (def storage (atom nil))
 (def bucket-name "neusa-datasets")

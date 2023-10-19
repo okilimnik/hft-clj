@@ -1,10 +1,9 @@
 (ns hft.core
   (:gen-class)
-  (:require
-   [clojure.string :as str]
-   [clojure.tools.cli :refer [parse-opts]]
-   [hft.api :as binance]
-   [hft.dataset :as dataset]))
+  (:require [clojure.string :as str]
+            [clojure.tools.cli :refer [parse-opts]]
+            [hft.api :as binance]
+            [hft.dataset :as dataset]))
 
 (def cli-options
   [["-d" "--dataset" "Prepare dataset"
