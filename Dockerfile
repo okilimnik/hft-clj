@@ -7,3 +7,7 @@ CMD ["java", "-jar", "app.jar", "-d"]
 # docker build -t neusa .
 # docker tag neusa asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest
 # docker push asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft
+
+# docker build -t neusa .
+# docker tag neusa neuronsages/neusa-jobs:latest
+# docker push neuronsages/neusa-jobs:latest
