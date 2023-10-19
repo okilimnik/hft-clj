@@ -142,10 +142,10 @@
                    (> qty BTC-TRADING-AMOUNT)))
         (apply min-key parse-double))))
 
-(defn get-next-sell-price [states]
+(defn get-next-sell-price [snapshot]
   (parse-double
    (apply max-key parse-double
-          (for [state states]
+          (for [state snapshot]
             (->> state
                  :bids
                  (.keySet)
@@ -162,10 +162,10 @@
                    (> qty BTC-TRADING-AMOUNT)))
         (apply max-key parse-double))))
 
-(defn get-next-buy-price [states]
+(defn get-next-buy-price [snapshot]
   (parse-double
    (apply min-key parse-double
-          (for [state states]
+          (for [state snapshot]
             (->> state
                  :asks
                  (.keySet)
@@ -231,7 +231,7 @@
                   (update :bids merge (:bids event))
                   (update :bids filter-pos-qty)))
       (if (> (count $) STATES-MAX-SIZE)
-        (vec (drop 1 $))
+        (subvec $ (- (count $) STATES-MAX-SIZE))
         $))))
 
 (defn calc-new-state [event]
