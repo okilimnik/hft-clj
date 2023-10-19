@@ -13,4 +13,3 @@ pom.xml
 /.idea
 *.iml
 .DS_Store
-gcloud.json

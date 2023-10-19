@@ -15,6 +15,6 @@ pom.xml
 /.idea
 *.iml
 binance.config.edn
-gcloud.json
+gcp.json
 .DS_Store
 /dataset

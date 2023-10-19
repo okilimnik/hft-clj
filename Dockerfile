@@ -1,6 +1,7 @@
 FROM ghcr.io/graalvm/jdk-community:latest
 COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
+COPY gcp.json ./
 CMD ["java", "-jar", "app.jar", "-d"]
 
 # docker build -t neusa .
