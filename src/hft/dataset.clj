@@ -1,6 +1,6 @@
 (ns hft.dataset
   (:require [cheshire.core :refer [parse-string]]
-            [clojure.core.async :refer [go <! go-loop] :as a]
+            [clojure.core.async :refer [thread <!! >!! chan] :as a]
             [clojure.java.io :as io]
             [clojure.math :as math]
             [clojure.set :as set]
@@ -22,8 +22,10 @@
 (def states (atom []))
 (def MAX-PRICE-INTERVAL-ADDITION 0.000001)
 (def QUANTITY-THRESHOLD 0.5)
+(def input-chan (chan 1))
+(def consuming-running? (atom false))
 
-(defn stop-preparation! []
+(defn stop-producer! []
   (.closeConnection @api/ws-client @api-stream-id))
 
 (defn ->image
@@ -95,41 +97,31 @@
 (defn format-float [price]
   (format "%.6f" price))
 
-(defn denoise [init-series init-min-price init-max-price]
-  (go-loop [series init-series 
-            min-price init-min-price 
-            max-price init-max-price]
-    (let [shift (- max-price min-price)
-          level-shift (/ shift INPUT-SIZE)
-          enriched-series (<! (a/map (fn [s]
-                                       (go
-                                         (-> s
-                                             (update :bids #(add-price-level % min-price level-shift))
-                                             (update :asks #(add-price-level % min-price level-shift)))))
-                                     series))
-          [bid-quantities-by-price-level ask-quantities-by-price-level] (<! (a/map identity
-                                                                                   [(a/map (fn [s]
-                                                                                             (go
-                                                                                               (calc-quantities-by-price-level (:bids s))))
-                                                                                           enriched-series)
-                                                                                    (a/map (fn [s]
-                                                                                             (go
-                                                                                               (calc-quantities-by-price-level (:asks s))))
-                                                                                           enriched-series)]))
-          filtered-series (<! (a/map
-                               (fn [[idx s]]
-                                 (go
-                                   (-> s
-                                       (update :bids #(remove-low-qty % (nth bid-quantities-by-price-level idx) QUANTITY-THRESHOLD))
-                                       (update :asks #(remove-low-qty % (nth ask-quantities-by-price-level idx) QUANTITY-THRESHOLD)))))
-                               (map-indexed
-                                vector
-                                enriched-series)))
-          [new-min-price new-max-price] (get-price-extremums filtered-series)]
-      (if (and (= (format-float new-max-price) (format-float max-price))
-               (= (format-float new-min-price) (format-float min-price)))
-        [bid-quantities-by-price-level ask-quantities-by-price-level]
-        (recur filtered-series new-min-price new-max-price)))))
+(defn denoise [series min-price max-price]
+  (let [shift (- max-price min-price)
+        level-shift (/ shift INPUT-SIZE)
+        enriched-series (map (fn [s]
+                               (-> s
+                                   (update :bids #(add-price-level % min-price level-shift))
+                                   (update :asks #(add-price-level % min-price level-shift))))
+                             series)
+        bid-quantities-by-price-level (map (fn [s]
+                                             (calc-quantities-by-price-level (:bids s)))
+                                           enriched-series)
+        ask-quantities-by-price-level (map (fn [s]
+                                             (calc-quantities-by-price-level (:asks s)))
+                                           enriched-series)
+        filtered-series (map-indexed
+                         (fn [idx s]
+                           (-> s
+                               (update :bids #(remove-low-qty % (nth bid-quantities-by-price-level idx) QUANTITY-THRESHOLD))
+                               (update :asks #(remove-low-qty % (nth ask-quantities-by-price-level idx) QUANTITY-THRESHOLD))))
+                         enriched-series)
+        [new-min-price new-max-price] (get-price-extremums filtered-series)]
+    (if (and (= (format-float new-max-price) (format-float max-price))
+             (= (format-float new-min-price) (format-float min-price)))
+      [bid-quantities-by-price-level ask-quantities-by-price-level]
+      (recur filtered-series new-min-price new-max-price))))
 
 (defn calc-change-level [current next]
   (let [shift (abs (- next current))
@@ -201,10 +193,9 @@
       (str bearish_label bullish_label))))
 
 (defn create-input-image [series]
-  (go
-    (let [[min-price max-price] (get-price-extremums series)
-          [bid-qties ask-qties] (time (<! (denoise series min-price max-price)))]
-      (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE))))
+  (let [[min-price max-price] (get-price-extremums series)
+        [bid-qties ask-qties] (denoise series min-price max-price)]
+    (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)))
 
 (defn mapify-prices [order-book]
   (-> order-book
@@ -248,22 +239,7 @@
     (swap! states #(add-to-states % event)))
   (let [snapshot @states]
     (when (= (count snapshot) STATES-MAX-SIZE)
-      (go
-        (try
-          (let [image (<! (create-input-image (take INPUT-SIZE snapshot)))
-                label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))
-                dir (io/file "./dataset")]
-            (when (not= label "00000000")
-              (when-not (.exists dir)
-                (.mkdirs dir))
-              (let [filename (str label "_" (swap! image-counter inc) " .png")
-                    filepath (str "./dataset/" filename)]
-                (i/save image filepath)
-                (upload-file! filename filepath)
-                (io/delete-file filepath))))
-          (catch Exception e
-            (stop-preparation!)
-            (prn e)))))))
+      (>!! input-chan snapshot))))
 
 (defn event->readable-event [event]
   (-> event
@@ -281,12 +257,41 @@
           (try
             (calc-new-state (event->readable-event event))
             (catch Exception e
-              (stop-preparation!)
+              (stop-producer!)
               (prn e)))
           (prn "ws event: " event))))))
 
-(defn prepare! []
+(defn start-consumer! []
+  (reset! consuming-running? true)
+  (thread
+    (while @consuming-running?
+      (let [snapshot (<!! input-chan)]
+        (try
+          (let [image (create-input-image (take INPUT-SIZE snapshot))
+                label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))
+                dir (io/file "./dataset")]
+            (log/debug "Created and labeled input data " (if (= label "00000000") "as noise" "as valid"))
+            (when (not= label "00000000")
+              (when-not (.exists dir)
+                (.mkdirs dir))
+              (let [filename (str label "_" (swap! image-counter inc) " .png")
+                    filepath (str "./dataset/" filename)]
+                (i/save image filepath)
+                (upload-file! filename filepath)
+                (io/delete-file filepath))))
+          (catch Exception e
+            (stop-producer!)
+            (prn e)))))))
+
+(defn stop-consumer! []
+  (reset! consuming-running? false))
+
+(defn start-producer! []
   (reset! api-stream-id (.diffDepthStream @api/ws-client SYMBOL 1000 on-order-book-change)))
+
+(defn prepare! []
+  (start-producer!)
+  (start-consumer!))
 
 ;(api/init)
 ;(prepare!)

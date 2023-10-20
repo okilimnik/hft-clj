@@ -1,4 +1,5 @@
-FROM ghcr.io/graalvm/jdk-community:latest
+# FROM ghcr.io/graalvm/graalvm-community:latest
+FROM amazoncorretto:21-alpine
 COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
 COPY gcp.json ./
@@ -12,4 +13,4 @@ CMD ["java", "-jar", "app.jar", "-d"]
 # docker tag neusa neuronsages/neusa-jobs:latest
 # docker push neuronsages/neusa-jobs:latest
 
-# lein run -d
+# export GOOGLE_CLOUD_CREDENTIALS=/Users/okilimnik/Projects/hft-clj/gcp.json && lein run -d

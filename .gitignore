@@ -18,3 +18,4 @@ binance.config.edn
 gcp.json
 .DS_Store
 /dataset
+/.vscode
