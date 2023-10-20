@@ -107,14 +107,15 @@
                                              (update :bids #(add-price-level % min-price level-shift))
                                              (update :asks #(add-price-level % min-price level-shift)))))
                                      series))
-          bid-quantities-by-price-level (<! (a/map (fn [s]
-                                                     (go
-                                                       (calc-quantities-by-price-level (:bids s))))
-                                                   enriched-series))
-          ask-quantities-by-price-level (<! (a/map (fn [s]
-                                                     (go
-                                                       (calc-quantities-by-price-level (:asks s))))
-                                                   enriched-series))
+          [bid-quantities-by-price-level ask-quantities-by-price-level] (<! (a/map identity
+                                                                                   [(a/map (fn [s]
+                                                                                             (go
+                                                                                               (calc-quantities-by-price-level (:bids s))))
+                                                                                           enriched-series)
+                                                                                    (a/map (fn [s]
+                                                                                             (go
+                                                                                               (calc-quantities-by-price-level (:asks s))))
+                                                                                           enriched-series)]))
           filtered-series (<! (a/map
                                (fn [[idx s]]
                                  (go
