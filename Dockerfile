@@ -11,3 +11,5 @@ CMD ["java", "-jar", "app.jar", "-d"]
 # docker build -t neusa .
 # docker tag neusa neuronsages/neusa-jobs:latest
 # docker push neuronsages/neusa-jobs:latest
+
+# lein run -d
