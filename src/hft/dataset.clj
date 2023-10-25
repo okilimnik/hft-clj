@@ -18,6 +18,7 @@
 (def BTC-TRADING-AMOUNT 0.02)
 (def STATES-MAX-SIZE (+ INPUT-SIZE PREDICTION-HEAD))
 (def api-stream-id (atom nil))
+;; using vector for states (and subvec fn) causes HeapOutOfMemory errors
 (def states (atom clojure.lang.PersistentQueue/EMPTY))
 (def MAX-PRICE-INTERVAL-ADDITION 0.000001)
 (def QUANTITY-THRESHOLD 0.5)
@@ -64,22 +65,13 @@
            (.keySet m))))
 
 (defn calc-quantities-by-price-level [m]
-  (let [unfiltered (persistent!
-                    (reduce (fn [out k]
-                              (let [v (get m k)
-                                    level (:price-level v)]
-                                (assoc! out level (+ (get out level 0) (:qty v)))))
-                            (transient {})
-                            (.keySet m)))]
-    unfiltered
-    #_(persistent!
-       (reduce (fn [out level]
-                 (let [qty (get out level 0)]
-                   (if (< qty QUANTITY-THRESHOLD)
-                     (dissoc! out level)
-                     out)))
-               (transient unfiltered)
-               (.keySet unfiltered)))))
+  (persistent!
+   (reduce (fn [out k]
+             (let [v (get m k)
+                   level (:price-level v)]
+               (assoc! out level (+ (get out level 0) (:qty v)))))
+           (transient {})
+           (.keySet m))))
 
 (defn remove-low-qty [m quantities-by-price-level threshold]
   (persistent!
