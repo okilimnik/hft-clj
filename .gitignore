@@ -19,3 +19,4 @@ gcp.json
 .DS_Store
 /dataset
 /.vscode
+image-counter.txt

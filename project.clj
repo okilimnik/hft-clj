@@ -3,7 +3,7 @@
   :url "http://hft-heroku.herokuapp.com"
   :license {:name "FIXME: choose"
             :url "http://example.com/FIXME"}
-  :dependencies [[org.clojure/clojure "1.11.0"]
+  :dependencies [[org.clojure/clojure "1.11.1"]
                  [org.clojure/core.async "1.6.681"]
                  [org.clojure/tools.cli "1.0.219"]
                  [cheshire/cheshire "5.11.0"]

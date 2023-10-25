@@ -1,8 +1,10 @@
+#FROM openjdk:21
 FROM ghcr.io/graalvm/graalvm-community:21
 COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
 COPY gcp.json ./
 ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
+#CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-d"]
 CMD ["java", "-jar", "app.jar", "-d"]
 
 # docker build -t neusa .
@@ -13,6 +15,8 @@ CMD ["java", "-jar", "app.jar", "-d"]
 # docker tag neusa neuronsages/neusa-jobs:latest
 # docker push neuronsages/neusa-jobs:latest
 
-# docker run -it --rm --memory=4000m --cpus=2 --name hft-clj-azul hft-clj-azul
+# docker run -it --rm --memory=1800m --cpus=1 --name neusa neusa
 
-# export GOOGLE_APPLICATION_CREDENTIALS=/Users/okilimnik/Projects/hft-clj/gcp.json && lein run -d
+# export GOOGLE_APPLICATION_CREDENTIALS=/Users/okilimnik/Projects/hft-clj/gcp.json
+# lein run -d
+# java -XX:+UseZGC -Xmx4g -jar target/uberjar/app.jar -d

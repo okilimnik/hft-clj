@@ -1,6 +1,6 @@
 (ns hft.dataset
   (:require [cheshire.core :refer [parse-string]]
-            [clojure.core.async :refer [thread <!! >!! chan] :as a]
+            [clojure.core.async :refer [thread <!! >!! chan sliding-buffer] :as a]
             [clojure.java.io :as io]
             [clojure.math :as math]
             [clojure.set :as set]
@@ -18,12 +18,18 @@
 (def BTC-TRADING-AMOUNT 0.02)
 (def STATES-MAX-SIZE (+ INPUT-SIZE PREDICTION-HEAD))
 (def api-stream-id (atom nil))
-(def image-counter (atom 0))
-(def states (atom []))
+(def states (atom clojure.lang.PersistentQueue/EMPTY))
 (def MAX-PRICE-INTERVAL-ADDITION 0.000001)
 (def QUANTITY-THRESHOLD 0.5)
-(def input-chan (chan 1))
+(def input-chan (chan (sliding-buffer 1)))
 (def consuming-running? (atom false))
+(def image-counter (atom nil))
+(def image-counter-file "./image-counter.txt")
+
+(defn get-image-number! []
+  (let [new-val (swap! image-counter inc)]
+    (spit image-counter-file (str new-val))
+    new-val))
 
 (defn stop-producer! []
   (.closeConnection @api/ws-client @api-stream-id))
@@ -228,7 +234,7 @@
                   (update :bids merge (:bids event))
                   (update :bids filter-pos-qty)))
       (if (> (count $) STATES-MAX-SIZE)
-        (subvec $ (- (count $) STATES-MAX-SIZE))
+        (pop $)
         $))))
 
 (defn calc-new-state [event]
@@ -236,10 +242,10 @@
     (swap! states conj (-> (api/depth! SYMBOL)
                            mapify-prices)))
   (when (> (:lastUpdateId event) (:lastUpdateId (last @states)))
-    (swap! states #(add-to-states % event)))
-  (let [snapshot @states]
-    (when (= (count snapshot) STATES-MAX-SIZE)
-      (>!! input-chan snapshot))))
+    (swap! states #(add-to-states % event))
+    (let [snapshot @states]
+      (when (= (count snapshot) STATES-MAX-SIZE)
+        (>!! input-chan snapshot)))))
 
 (defn event->readable-event [event]
   (-> event
@@ -258,8 +264,8 @@
             (calc-new-state (event->readable-event event))
             (catch Exception e
               (stop-producer!)
-              (prn e)))
-          (prn "ws event: " event))))))
+              (log/error e)))
+          (log/warn "ws event: " event))))))
 
 (defn start-consumer! []
   (reset! consuming-running? true)
@@ -274,14 +280,14 @@
             (when (not= label "00000000")
               (when-not (.exists dir)
                 (.mkdirs dir))
-              (let [filename (str label "_" (swap! image-counter inc) " .png")
+              (let [filename (str label "_" (get-image-number!) " .png")
                     filepath (str "./dataset/" filename)]
                 (i/save image filepath)
                 (upload-file! filename filepath)
                 (io/delete-file filepath))))
           (catch Exception e
             (stop-producer!)
-            (prn e)))))))
+            (log/error e)))))))
 
 (defn stop-consumer! []
   (reset! consuming-running? false))
@@ -289,7 +295,16 @@
 (defn start-producer! []
   (reset! api-stream-id (.diffDepthStream @api/ws-client SYMBOL 1000 on-order-book-change)))
 
+(defn init-image-counter []
+  (let [init-val (parse-long
+                  (try
+                    (slurp image-counter-file)
+                    (catch Exception _
+                      "0")))]
+    (reset! image-counter init-val)))
+
 (defn prepare! []
+  (init-image-counter)
   (start-producer!)
   (start-consumer!))
 
