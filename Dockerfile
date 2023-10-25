@@ -4,8 +4,7 @@ COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
 COPY gcp.json ./
 ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
-#CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-d"]
-CMD ["java", "-jar", "app.jar", "-d"]
+CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-d"]
 
 # docker build -t neusa .
 # docker tag neusa asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest
