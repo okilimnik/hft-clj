@@ -1,4 +1,4 @@
-#FROM openjdk:21
+#FROM openjdk:21 - works twice slower
 FROM ghcr.io/graalvm/graalvm-community:21
 COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
