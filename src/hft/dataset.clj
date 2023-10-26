@@ -1,15 +1,16 @@
 (ns hft.dataset
-  (:require [cheshire.core :refer [parse-string]]
-            [clojure.core.async :refer [thread <!! >!! chan sliding-buffer] :as a]
+  (:refer-clojure
+   :exclude
+   [get nth assoc get-in merge assoc-in update-in select-keys destructure let fn loop defn defn-])
+  (:require [clojure.core.async :refer [thread <!! >!! chan sliding-buffer] :as a]
             [clojure.java.io :as io]
             [clojure.math :as math]
-            [clojure.set :as set]
             [hft.api :as api]
             [mikera.image.core :as i]
             [taoensso.timbre :as log]
-            [hft.gcloud :refer [upload-file!]])
-  (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
-           [java.awt Color]))
+            [hft.gcloud :refer [upload-file!]]
+            [clj-fast.clojure.core :refer [get nth assoc get-in merge assoc-in update-in select-keys destructure let fn loop defn defn-]])
+  (:import [java.awt Color]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 60)
@@ -57,33 +58,30 @@
     image))
 
 (defn add-price-level [m min-price level-shift]
-  (persistent!
-   (reduce (fn [out k]
-             (let [v (get out k)]
-               (assoc! out k (assoc v :price-level (int (/ (- (parse-double k) min-price) level-shift))))))
-           (transient m)
-           (.keySet m))))
+  (reduce (fn [out k]
+            (let [v (get out k)]
+              (assoc out k (assoc v :price-level (int (/ (- (parse-double k) min-price) level-shift))))))
+          m
+          (.keySet m)))
 
 (defn calc-quantities-by-price-level [m]
-  (persistent!
-   (reduce (fn [out k]
-             (let [v (get m k)
-                   level (:price-level v)]
-               (assoc! out level (+ (get out level 0) (:qty v)))))
-           (transient {})
-           (.keySet m))))
+  (reduce (fn [out k]
+            (let [v (get m k)
+                  level (:price-level v)]
+              (assoc out level (+ (get out level 0) (:qty v)))))
+          {}
+          (.keySet m)))
 
 (defn remove-low-qty [m quantities-by-price-level threshold]
-  (persistent!
-   (reduce (fn [out k]
-             (let [v (get m k)
-                   level (:price-level v)
-                   qty (get quantities-by-price-level level 0)]
-               (if (< qty threshold)
-                 (dissoc! out k)
-                 out)))
-           (transient m)
-           (.keySet m))))
+  (reduce (fn [out k]
+            (let [v (get m k)
+                  level (:price-level v)
+                  qty (get quantities-by-price-level level 0)]
+              (if (< qty threshold)
+                (dissoc out k)
+                out)))
+          m
+          (.keySet m)))
 
 (defn get-price-extremums [series]
   (let [prices (concat (mapcat (comp keys :bids) series)
@@ -192,7 +190,7 @@
 
 (defn create-input-image [series]
   (let [[min-price max-price] (get-price-extremums series)
-        [bid-qties ask-qties] (denoise series min-price max-price)]
+        [bid-qties ask-qties] (time (denoise series min-price max-price))]
     (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)))
 
 (defn mapify-prices [order-book]
@@ -206,58 +204,18 @@
                                             [price {:qty (parse-double qty)}]))
                                     (into {}))))))
 
-(defn filter-pos-qty [m]
-  (persistent!
-   (reduce (fn [out k]
-             (let [v (get out k)]
-               (if (pos? (:qty v))
-                 out
-                 (dissoc! out k))))
-           (transient m)
-           (.keySet m))))
-
-(defn add-to-states [current-states event]
-  (let [last-state (last current-states)]
-    (as-> current-states $
-      (conj $ (-> last-state
-                  (assoc :lastUpdateId (:lastUpdateId event))
-                  (update :asks merge (:asks event))
-                  (update :asks filter-pos-qty)
-                  (update :bids merge (:bids event))
-                  (update :bids filter-pos-qty)))
-      (if (> (count $) STATES-MAX-SIZE)
-        (pop $)
-        $))))
-
-(defn calc-new-state [event]
-  (when (empty? @states)
-    (swap! states conj (-> (api/depth! SYMBOL)
-                           mapify-prices)))
-  (when (> (:lastUpdateId event) (:lastUpdateId (last @states)))
-    (swap! states #(add-to-states % event))
-    (let [snapshot @states]
-      (when (= (count snapshot) STATES-MAX-SIZE)
-        (>!! input-chan snapshot)))))
-
-(defn event->readable-event [event]
-  (-> event
-      (select-keys [:u :b :a])
-      (set/rename-keys {:u :lastUpdateId
-                        :b :bids
-                        :a :asks})
-      mapify-prices))
-
-(def on-order-book-change
-  (reify WebSocketMessageCallback
-    (onMessage [_this json]
-      (let [event (parse-string json true)]
-        (if (= (:e event) "depthUpdate")
-          (try
-            (calc-new-state (event->readable-event event))
-            (catch Exception e
-              (stop-producer!)
-              (log/error e)))
-          (log/warn "ws event: " event))))))
+(defn calc-new-state []
+  (let [event (api/depth! SYMBOL)]
+    (when (> (:lastUpdateId event) (or (:lastUpdateId (last @states)) 0))
+      (swap! states (fn [s]
+                      (as-> s $
+                        (conj $ (mapify-prices event))
+                        (if (> (count $) STATES-MAX-SIZE)
+                          (pop $)
+                          $))))
+      (let [snapshot @states]
+        (when (= (count snapshot) STATES-MAX-SIZE)
+          (>!! input-chan snapshot))))))
 
 (defn start-consumer! []
   (reset! consuming-running? true)
@@ -285,7 +243,14 @@
   (reset! consuming-running? false))
 
 (defn start-producer! []
-  (reset! api-stream-id (.diffDepthStream @api/ws-client SYMBOL 1000 on-order-book-change)))
+  (let [interval 3000]
+    (loop [t (System/currentTimeMillis)]
+      (let [delta (- (System/currentTimeMillis) t)]
+        (if (>= delta interval)
+          (do (calc-new-state)
+              (recur (System/currentTimeMillis)))
+          (do (Thread/sleep (- interval delta))
+              (recur t)))))))
 
 (defn init-image-counter []
   (let [init-val (parse-long
@@ -297,8 +262,8 @@
 
 (defn prepare! []
   (init-image-counter)
-  (start-producer!)
-  (start-consumer!))
+  (start-consumer!)
+  (start-producer!))
 
 ;(api/init)
 ;(prepare!)

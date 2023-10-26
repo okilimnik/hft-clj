@@ -1,5 +1,5 @@
 (ns hft.api
-  (:require [cheshire.core :refer [parse-string]]
+  (:require [jsonista.core :as j]
             [clojure.core.async :refer [go]]
             [clojure.edn :as edn])
   (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]))
@@ -9,9 +9,12 @@
 (def market-client (atom nil))
 (def ws-client (atom nil))
 
+(defn jread [v]
+  (j/read-value v j/keyword-keys-object-mapper))
+
 #_(defn open-order! [params]
     (-> (.newOrder trade-client params)
-        (parse-string true)))
+        jread))
 
 (defn init []
   (let [config (:prod (edn/read-string (slurp "binance.config.edn")))]
@@ -21,19 +24,19 @@
 
 (defn depth! [symbol]
   (-> (.depth @market-client {"symbol" symbol "limit" 5000})
-      (parse-string true)))
+      jread))
 
 (defn trades! []
   (go
     (-> (.trades @market-client {"symbol" SYMBOL})
-        (parse-string true))))
+        jread)))
 
 (defn best-price! []
   (go
     (-> (.bookTicker @market-client {"symbol" SYMBOL})
-        (parse-string true))))
+        jread)))
 
 (defn ticker! [& [params]]
   (go
     (-> (.ticker @market-client (merge {"symbol" SYMBOL} params))
-        (parse-string true))))
+        jread)))
