@@ -1,15 +1,11 @@
 (ns hft.dataset
-  #_(:refer-clojure
-   :exclude
-   [get nth assoc get-in merge assoc-in update-in select-keys destructure let fn loop defn defn-])
   (:require [clojure.core.async :refer [thread <!! >!! chan sliding-buffer] :as a]
             [clojure.java.io :as io]
             [clojure.math :as math]
             [hft.api :as api]
             [mikera.image.core :as i]
             [taoensso.timbre :as log]
-            [hft.gcloud :refer [upload-file!]]
-            #_[clj-fast.clojure.core :refer [get nth assoc get-in merge assoc-in update-in select-keys destructure let fn loop defn defn-]])
+            [hft.gcloud :refer [upload-file!]])
   (:import [java.awt Color]))
 
 (def SYMBOL "BTCUSDT")
