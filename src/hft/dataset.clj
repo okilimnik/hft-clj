@@ -1,5 +1,5 @@
 (ns hft.dataset
-  (:refer-clojure
+  #_(:refer-clojure
    :exclude
    [get nth assoc get-in merge assoc-in update-in select-keys destructure let fn loop defn defn-])
   (:require [clojure.core.async :refer [thread <!! >!! chan sliding-buffer] :as a]
@@ -9,7 +9,7 @@
             [mikera.image.core :as i]
             [taoensso.timbre :as log]
             [hft.gcloud :refer [upload-file!]]
-            [clj-fast.clojure.core :refer [get nth assoc get-in merge assoc-in update-in select-keys destructure let fn loop defn defn-]])
+            #_[clj-fast.clojure.core :refer [get nth assoc get-in merge assoc-in update-in select-keys destructure let fn loop defn defn-]])
   (:import [java.awt Color]))
 
 (def SYMBOL "BTCUSDT")
@@ -58,30 +58,33 @@
     image))
 
 (defn add-price-level [m min-price level-shift]
-  (reduce (fn [out k]
-            (let [v (get out k)]
-              (assoc out k (assoc v :price-level (int (/ (- (parse-double k) min-price) level-shift))))))
-          m
-          (.keySet m)))
+  (persistent!
+   (reduce (fn [out k]
+             (let [v (get out k)]
+               (assoc! out k (assoc v :price-level (int (/ (- (parse-double k) min-price) level-shift))))))
+           (transient m)
+           (.keySet m))))
 
 (defn calc-quantities-by-price-level [m]
-  (reduce (fn [out k]
-            (let [v (get m k)
-                  level (:price-level v)]
-              (assoc out level (+ (get out level 0) (:qty v)))))
-          {}
-          (.keySet m)))
+  (persistent!
+   (reduce (fn [out k]
+             (let [v (get m k)
+                   level (:price-level v)]
+               (assoc! out level (+ (get out level 0) (:qty v)))))
+           (transient {})
+           (.keySet m))))
 
 (defn remove-low-qty [m quantities-by-price-level threshold]
-  (reduce (fn [out k]
-            (let [v (get m k)
-                  level (:price-level v)
-                  qty (get quantities-by-price-level level 0)]
-              (if (< qty threshold)
-                (dissoc out k)
-                out)))
-          m
-          (.keySet m)))
+  (persistent!
+   (reduce (fn [out k]
+             (let [v (get m k)
+                   level (:price-level v)
+                   qty (get quantities-by-price-level level 0)]
+               (if (< qty threshold)
+                 (dissoc! out k)
+                 out)))
+           (transient m)
+           (.keySet m))))
 
 (defn get-price-extremums [series]
   (let [prices (concat (mapcat (comp keys :bids) series)
