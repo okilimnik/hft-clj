@@ -9,6 +9,7 @@
   (:import [java.awt Color]))
 
 (def SYMBOL "BTCUSDT")
+(def DECIMALS 2)
 (def INPUT-SIZE 60)
 (def PREDICTION-HEAD 10)
 (def LEVEL-PRICE-CHANGE-PERCENT 0.04)
@@ -17,7 +18,7 @@
 (def api-stream-id (atom nil))
 ;; using vector for states (and subvec fn) causes HeapOutOfMemory errors
 (def states (atom clojure.lang.PersistentQueue/EMPTY))
-(def MAX-PRICE-INTERVAL-ADDITION 0.000001)
+(def MAX-PRICE-INTERVAL-ADDITION 0.1)
 (def QUANTITY-THRESHOLD 0.5)
 (def input-chan (chan (sliding-buffer 1)))
 (def consuming-running? (atom false))
@@ -55,42 +56,37 @@
 
 (defn add-price-level [m min-price level-shift]
   (persistent!
-   (reduce (fn [out k]
-             (let [v (get out k)]
-               (assoc! out k (assoc v :price-level (int (/ (- (parse-double k) min-price) level-shift))))))
-           (transient m)
-           (.keySet m))))
+   (reduce-kv
+    (fn [out k v]
+      (assoc! out k (assoc v :price-level (int (/ (- k min-price) level-shift)))))
+    (transient m)
+    m)))
 
 (defn calc-quantities-by-price-level [m]
   (persistent!
-   (reduce (fn [out k]
-             (let [v (get m k)
-                   level (:price-level v)]
-               (assoc! out level (+ (get out level 0) (:qty v)))))
-           (transient {})
-           (.keySet m))))
+   (reduce-kv (fn [out _k v]
+                (let [level (:price-level v)]
+                  (assoc! out level (+ (get out level 0) (:qty v)))))
+              (transient {})
+              m)))
 
 (defn remove-low-qty [m quantities-by-price-level threshold]
   (persistent!
-   (reduce (fn [out k]
-             (let [v (get m k)
-                   level (:price-level v)
-                   qty (get quantities-by-price-level level 0)]
-               (if (< qty threshold)
-                 (dissoc! out k)
-                 out)))
-           (transient m)
-           (.keySet m))))
+   (reduce-kv (fn [out k v]
+                (let [level (:price-level v)
+                      qty (get quantities-by-price-level level 0)]
+                  (if (< qty threshold)
+                    (dissoc! out k)
+                    out)))
+              (transient m)
+              m)))
 
 (defn get-price-extremums [series]
   (let [prices (concat (mapcat (comp keys :bids) series)
                        (mapcat (comp keys :asks) series))
-        max-price (+ (parse-double (apply max-key parse-double prices)) MAX-PRICE-INTERVAL-ADDITION)
-        min-price (parse-double (apply min-key parse-double prices))]
+        max-price (+ (apply max prices) MAX-PRICE-INTERVAL-ADDITION)
+        min-price (apply min prices)]
     [min-price max-price]))
-
-(defn format-float [price]
-  (format "%.6f" price))
 
 (defn denoise [series min-price max-price]
   (let [shift (- max-price min-price)
@@ -113,8 +109,8 @@
                                (update :asks #(remove-low-qty % (nth ask-quantities-by-price-level idx) QUANTITY-THRESHOLD))))
                          enriched-series)
         [new-min-price new-max-price] (get-price-extremums filtered-series)]
-    (if (and (= (format-float new-max-price) (format-float max-price))
-             (= (format-float new-min-price) (format-float min-price)))
+    (if (and (= new-max-price max-price)
+             (= new-min-price min-price))
       [bid-quantities-by-price-level ask-quantities-by-price-level]
       (recur filtered-series new-min-price new-max-price))))
 
@@ -126,44 +122,40 @@
       change-level)))
 
 (defn get-current-buy-price [state]
-  (parse-double
-   (->> state
-        :asks
-        (.keySet)
-        (filter #(let [qty (get-in state [:asks % :qty])]
-                   (> qty BTC-TRADING-AMOUNT)))
-        (apply min-key parse-double))))
+  (->> state
+       :asks
+       (.keySet)
+       (filter #(let [qty (get-in state [:asks % :qty])]
+                  (> qty BTC-TRADING-AMOUNT)))
+       (apply min)))
 
 (defn get-next-sell-price [snapshot]
-  (parse-double
-   (apply max-key parse-double
-          (for [state snapshot]
-            (->> state
-                 :bids
-                 (.keySet)
-                 (filter #(let [qty (get-in state [:bids % :qty])]
-                            (> qty BTC-TRADING-AMOUNT)))
-                 (apply max-key parse-double))))))
+  (apply max
+         (for [state snapshot]
+           (->> state
+                :bids
+                (.keySet)
+                (filter #(let [qty (get-in state [:bids % :qty])]
+                           (> qty BTC-TRADING-AMOUNT)))
+                (apply max)))))
 
 (defn get-current-sell-price [state]
-  (parse-double
-   (->> state
-        :bids
-        (.keySet)
-        (filter #(let [qty (get-in state [:bids % :qty])]
-                   (> qty BTC-TRADING-AMOUNT)))
-        (apply max-key parse-double))))
+  (->> state
+       :bids
+       (.keySet)
+       (filter #(let [qty (get-in state [:bids % :qty])]
+                  (> qty BTC-TRADING-AMOUNT)))
+       (apply max)))
 
 (defn get-next-buy-price [snapshot]
-  (parse-double
-   (apply min-key parse-double
-          (for [state snapshot]
-            (->> state
-                 :asks
-                 (.keySet)
-                 (filter #(let [qty (get-in state [:asks % :qty])]
-                            (> qty BTC-TRADING-AMOUNT)))
-                 (apply min-key parse-double))))))
+  (apply min
+         (for [state snapshot]
+           (->> state
+                :asks
+                (.keySet)
+                (filter #(let [qty (get-in state [:asks % :qty])]
+                           (> qty BTC-TRADING-AMOUNT)))
+                (apply min)))))
 
 (defn calc-label [current-state next-states]
   (let [current-buy-price (get-current-buy-price current-state)
@@ -192,15 +184,18 @@
         [bid-qties ask-qties] (time (denoise series min-price max-price))]
     (->image bid-qties ask-qties INPUT-SIZE INPUT-SIZE)))
 
+(defn ->int [price]
+  (int (* (parse-double price) (Math/pow 10 DECIMALS))))
+
 (defn mapify-prices [order-book]
   (-> order-book
       (update :bids (fn [bids] (->> bids
                                     (mapv (fn [[price qty]]
-                                            [price {:qty (parse-double qty)}]))
+                                            [(->int price) {:qty (parse-double qty)}]))
                                     (into {}))))
       (update :asks (fn [asks] (->> asks
                                     (mapv (fn [[price qty]]
-                                            [price {:qty (parse-double qty)}]))
+                                            [(->int price) {:qty (parse-double qty)}]))
                                     (into {}))))))
 
 (defn calc-new-state []

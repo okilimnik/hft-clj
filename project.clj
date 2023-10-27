@@ -11,8 +11,7 @@
                  [com.fzakaria/slf4j-timbre "0.4.0"]
                  [io.github.binance/binance-connector-java "3.0.0rc3"]
                  [com.google.cloud/google-cloud-storage "2.25.0"]
-                 [net.mikera/imagez "0.12.0"]
-                 [bsless/clj-fast "0.0.10"]]
+                 [net.mikera/imagez "0.12.0"]]
   :main hft.core
   :target-path "target/%s"
   :uberjar-name "app.jar"

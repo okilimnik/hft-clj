@@ -16,9 +16,11 @@
        (str/join \newline errors)))
 
 (defn -main [& args]
-  (let [{:keys [options _arguments errors _summary]} (parse-opts args cli-options)]
-    (cond
-      errors (println (error-msg errors))
-      (:dataset options) (do (binance/init)
-                             (dataset/prepare!))
-      :else (println "No command provided, exiting..."))))
+  (binance/init)
+  (dataset/prepare!)
+  #_(let [{:keys [options _arguments errors _summary]} (parse-opts args cli-options)]
+      (cond
+        errors (println (error-msg errors))
+        (:dataset options) (do (binance/init)
+                               (dataset/prepare!))
+        :else (println "No command provided, exiting..."))))

@@ -7,6 +7,10 @@ pom.xml
 /.calva
 /.lsp
 /.clj-kondo
+/.vscode
+/dataset
+/target
+/test
 *.txt
 /models
 .nrepl-port
