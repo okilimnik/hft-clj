@@ -9,7 +9,6 @@ pom.xml
 /.clj-kondo
 /.vscode
 /dataset
-/target
 /test
 *.txt
 /models

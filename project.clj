@@ -11,7 +11,11 @@
                  [com.fzakaria/slf4j-timbre "0.4.0"]
                  [io.github.binance/binance-connector-java "3.0.0rc3"]
                  [com.google.cloud/google-cloud-storage "2.25.0"]
-                 [net.mikera/imagez "0.12.0"]]
+                 [net.mikera/imagez "0.12.0"]
+                 [ai.djl/api "0.24.0"]
+                 [ai.djl.mxnet/mxnet-engine "0.24.0"]
+                 [ai.djl/basicdataset "0.24.0"]
+                 [ai.djl/model-zoo "0.24.0"]]
   :main hft.core
   :target-path "target/%s"
   :uberjar-name "app.jar"

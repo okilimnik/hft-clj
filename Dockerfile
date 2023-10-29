@@ -13,8 +13,6 @@ CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-d"]
 # docker tag neusa neuronsages/neusa-jobs:latest
 # docker push neuronsages/neusa-jobs:latest
 
-# docker run -it --rm --memory=1800m --cpus=1 --name neusa neusa
+# docker run -it --rm --memory=8000m --cpus=1 --name neusa neusa
 
-# export GOOGLE_APPLICATION_CREDENTIALS=/Users/okilimnik/Projects/hft-clj/gcp.json
-# lein run -d
-# java -XX:+UseZGC -Xmx4g -jar target/uberjar/app.jar -d
+# GOOGLE_APPLICATION_CREDENTIALS=/Users/okilimnik/Projects/hft-clj/gcp.json lein run -d
