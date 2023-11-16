@@ -1,25 +1,26 @@
 (ns split-dataset 
   (:require [clojure.java.io :as io]))
 
-(def categories
-  {"00010000"   8204
-   "00001000"   8005
-   "00000100"   2370
-   "01000000"   683
-   "10000000"   324
-   "00100000"   2615
-   "00000001"   330
-   "00000010"   587})
+(def categories #{"10000000"
+                  "01000000"
+                  "00100000"
+                 ; "00010000"
+                 ; "00001000"
+                  "00000100"
+                  "00000010"
+                  "00000001"})
 
 (def folder "./dataset")
 
-(let [quantity (apply min (vals categories))
-      train-quantity (int (* 0.7 quantity))
-      test-quantity (- quantity train-quantity)]
-  (doseq [cat (keys categories)]
+(let [get-train-quantity (fn [total] (int (* 0.7 total)))
+      get-test-quantity (fn [total train-quantity] (- total train-quantity))]
+  (doseq [cat categories]
     (let [files (-> (io/file (str folder "/" cat))
                     file-seq
                     shuffle)
+          total (count files)
+          train-quantity (get-train-quantity total)
+          test-quantity (get-test-quantity total train-quantity)
           train (take train-quantity files)
           test (->> files
                     (drop train-quantity)

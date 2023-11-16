@@ -224,7 +224,7 @@
             (when (not= label "00000000")
               (when-not (.exists dir)
                 (.mkdirs dir))
-              (let [filename (str label "_" (get-image-number!) " .png")
+              (let [filename (str label "_" (get-image-number!) ".png")
                     filepath (str "./dataset/" filename)]
                 (i/save image filepath)
                 (upload-file! filename filepath)

@@ -2,7 +2,10 @@ FROM ghcr.io/graalvm/graalvm-community:21
 COPY target/uberjar/app.jar ./
 COPY binance.config.edn ./
 COPY gcp.json ./
+COPY image-counter.txt ./
 ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
+# w/o specifing GC and with 8gb memory it takes ~ 300ms to denoise
+# need to check what time is with ZGC?
 CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-d"]
 
 # docker build -t neusa .
