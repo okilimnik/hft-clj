@@ -10,7 +10,7 @@ pom.xml
 /.lsp
 /.clj-kondo
 *.txt
-/models
+/model
 .nrepl-port
 /.idea
 *.iml

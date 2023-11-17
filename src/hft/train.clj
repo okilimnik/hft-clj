@@ -1,5 +1,6 @@
 (ns hft.train
-  (:require [hft.gcloud :refer [upload-model!]])
+  (:require [clojure.java.io :as io]
+            [hft.gcloud :refer [upload-model!]])
   (:import (ai.djl Model)
            (ai.djl.basicdataset.cv.classification ImageFolder)
            (ai.djl.basicmodelzoo.cv.classification ResNetV1)
@@ -9,19 +10,20 @@
            (ai.djl.ndarray.types Shape)
            (ai.djl.repository Repository)
            (ai.djl.training DefaultTrainingConfig EasyTrain)
-           (ai.djl.training.evaluator TopKAccuracy)
+           (ai.djl.training.evaluator Accuracy)
            (ai.djl.training.listener TrainingListener$Defaults)
            (ai.djl.training.loss Loss)
            (ai.djl.training.optimizer Optimizer)
            (ai.djl.training.tracker Tracker)
+           [java.nio.file Paths]
            (java.util Arrays)))
 
-(def lr 0.001)
-(def epochs 10)
+(def lr 0.005)
+(def epochs 46)
 (def batch-size 20)
 (def IMAGE-SIZE 60)
 (def IMAGE-NUM-CHAN 3)
-(def NUM-CATEGORIES 6)
+(def NUM-CATEGORIES 2)
 (def MODEL-NAME "cnn")
 (def MODEL-FOLDER "./model")
 
@@ -29,7 +31,7 @@
   (.build
    (doto (ResNetV1/builder)
      (.setImageShape (Shape. (Arrays/asList (into-array [(:num-chan img-opts) (:width img-opts) (:height img-opts)]))))
-     (.setNumLayers 50)
+     (.setNumLayers 18)
      (.setOutSize num-categories))))
 
 (defn get-model [options]
@@ -46,12 +48,20 @@
     (.prepare dataset)
     dataset))
 
+(defn load-model [options]
+  (doto (get-model options)
+    (.load (Paths/get (.toURI (io/file MODEL-FOLDER))))))
+
 (defn run []
   (let [_memory-manager (NDManager/newBaseManager)
         model (get-model {:img-opts {:width IMAGE-SIZE
                                      :height IMAGE-SIZE
                                      :num-chan IMAGE-NUM-CHAN}
                           :num-categories NUM-CATEGORIES})
+        #_(load-model {:img-opts {:width IMAGE-SIZE
+                                  :height IMAGE-SIZE
+                                  :num-chan IMAGE-NUM-CHAN}
+                       :num-categories NUM-CATEGORIES})
         loss (Loss/softmaxCrossEntropyLoss)
         lrt (Tracker/fixed lr)
         sgd (-> (Optimizer/sgd)
@@ -59,7 +69,7 @@
                 (.build))
         config (-> (DefaultTrainingConfig. loss)
                    (.optOptimizer sgd)
-                   (.addEvaluator (TopKAccuracy. 2))
+                   (.addEvaluator (Accuracy.))
                    (.addTrainingListeners (TrainingListener$Defaults/logging)))
         inputShape (Shape. (Arrays/asList (into-array [1 IMAGE-NUM-CHAN IMAGE-SIZE IMAGE-SIZE])))
         trainer (doto (.newTrainer model config)
@@ -68,11 +78,8 @@
         train-set (get-dataset "./dataset/train")
         test-set (get-dataset "./dataset/test")]
     (EasyTrain/fit trainer epochs train-set test-set)
-    (prn (.getTrainingResult trainer))
+    ;(prn (.getTrainingResult trainer))
     (.setProperty model "Epoch" (str epochs))
-    (.save model MODEL-FOLDER MODEL-NAME)
+    (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME)
     (upload-model! MODEL-FOLDER)))
 
-(defn load-model [options]
-  (doto (get-model options)
-    (.load "./model")))
