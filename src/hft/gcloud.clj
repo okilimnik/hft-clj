@@ -15,3 +15,11 @@
           blob-info (.build (BlobInfo/newBuilder blob-id))]
       (.createFrom @storage blob-info (io/input-stream (io/file filepath)) (into-array Storage$BlobWriteOption [])))
     (catch Exception e (prn e))))
+
+(defn upload-model! [model-folder]
+  #_(try
+    (when-not @storage (init!))
+    (let [blob-id (BlobId/of bucket-name (str "model/" filename))
+          blob-info (.build (BlobInfo/newBuilder blob-id))]
+      (.createFrom @storage blob-info (io/input-stream (io/file filepath)) (into-array Storage$BlobWriteOption [])))
+    (catch Exception e (prn e))))

@@ -1,9 +1,11 @@
 (ns hft.train
+  (:require [hft.gcloud :refer [upload-model!]])
   (:import (ai.djl Model)
            (ai.djl.basicdataset.cv.classification ImageFolder)
            (ai.djl.basicmodelzoo.cv.classification ResNetV1)
            (ai.djl.metric Metrics)
            (ai.djl.modality.cv.transform ToTensor)
+           (ai.djl.ndarray NDManager)
            (ai.djl.ndarray.types Shape)
            (ai.djl.repository Repository)
            (ai.djl.training DefaultTrainingConfig EasyTrain)
@@ -12,7 +14,7 @@
            (ai.djl.training.loss Loss)
            (ai.djl.training.optimizer Optimizer)
            (ai.djl.training.tracker Tracker)
-           [java.util Arrays]))
+           (java.util Arrays)))
 
 (def lr 0.001)
 (def epochs 10)
@@ -45,7 +47,8 @@
     dataset))
 
 (defn run []
-  (let [model (get-model {:img-opts {:width IMAGE-SIZE
+  (let [_memory-manager (NDManager/newBaseManager)
+        model (get-model {:img-opts {:width IMAGE-SIZE
                                      :height IMAGE-SIZE
                                      :num-chan IMAGE-NUM-CHAN}
                           :num-categories NUM-CATEGORIES})
@@ -67,7 +70,8 @@
     (EasyTrain/fit trainer epochs train-set test-set)
     (prn (.getTrainingResult trainer))
     (.setProperty model "Epoch" (str epochs))
-    (.save model MODEL-FOLDER MODEL-NAME)))
+    (.save model MODEL-FOLDER MODEL-NAME)
+    (upload-model! MODEL-FOLDER)))
 
 (defn load-model [options]
   (doto (get-model options)
