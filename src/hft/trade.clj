@@ -1,8 +1,9 @@
 (ns hft.trade
-  (:require [clojure.java.io :as io]
+  (:require [clojure.core.async :refer [thread <!!]]
+            [clojure.java.io :as io]
+            [mikera.image.core :as i]
             [hft.dataset :as dataset]
-            [hft.train :as train]
-            [juxt.dirwatch :refer [watch-dir]]) 
+            [hft.train :as train]) 
   (:import [ai.djl.ndarray NDManager]))
 
 (def model (atom nil))
@@ -11,10 +12,18 @@
   (let [_memory-manager (NDManager/newBaseManager)]
     (reset! model (train/load-model))))
 
-(defn trade! [data]
-  (prn-str data))
+(defn start-consumer! []
+  (thread
+    (let [snapshot (<!! dataset/input-chan)
+          image (dataset/create-input-image (drop dataset/PREDICTION-HEAD snapshot))
+          dir (io/file "./trade")
+          filename "input.png"
+          filepath (str "./trade/" filename)]
+      (when-not (.exists dir)
+        (.mkdirs dir))
+      (i/save image filepath))))
 
 (defn start! []
   (load-model)
-  (watch-dir trade! (io/file "./trade"))
-  (dataset/prepare!))
+  (start-consumer!)
+  (dataset/start-producer!))

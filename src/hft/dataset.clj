@@ -1,5 +1,5 @@
 (ns hft.dataset
-  (:require [clojure.core.async :refer [thread <!! >!! chan sliding-buffer] :as a]
+  (:require [clojure.core.async :refer [thread <!! >!! chan sliding-buffer]]
             [clojure.java.io :as io]
             [clojure.math :as math]
             [hft.api :as api]
@@ -223,7 +223,6 @@
             (when (or (= label "10000000")
                       (= label "00000001"))
 
-              ;; save file for training
               (let [train-dir (io/file "./dataset")]
                 (when-not (.exists train-dir)
                   (.mkdirs train-dir))
@@ -231,15 +230,7 @@
                       train-filepath (str "./dataset/" train-filename)]
                   (i/save image train-filepath)
                   (upload-file! train-filename train-filepath)
-                  (io/delete-file train-filepath)))
-
-              ;; save file for trading
-              (let [trade-dir (io/file "./trade")]
-                (when-not (.exists trade-dir)
-                  (.mkdirs trade-dir))
-                (let [trade-filename (str label ".png")
-                      trade-filepath (str "./trade/" trade-filename)]
-                  (i/save image trade-filepath)))))
+                  (io/delete-file train-filepath)))))
           
           (catch Exception e
             (stop-producer!)

@@ -15,8 +15,7 @@
                  [ai.djl/api "0.24.0"]
                  [ai.djl.mxnet/mxnet-engine "0.24.0"]
                  [ai.djl/basicdataset "0.24.0"]
-                 [ai.djl/model-zoo "0.24.0"]
-                 [juxt/dirwatch "0.2.5"]]
+                 [ai.djl/model-zoo "0.24.0"]]
   :main hft.core
   :target-path "target/%s"
   :uberjar-name "app.jar"
