@@ -1,5 +1,5 @@
 (ns hft.trade
-  (:require [clojure.core.async :refer [<!! thread]]
+  (:require [clojure.core.async :refer [<!! thread chan sliding-buffer]]
             [clojure.java.io :as io]
             [hft.dataset :as dataset]
             [hft.train :as train]
@@ -14,6 +14,7 @@
 (def root "./trade")
 (def predictor (atom nil))
 (def consuming-running? (atom false))
+(def input-chan (chan (sliding-buffer 1)))
 
 (defn load-model []
   (let [_memory-manager (NDManager/newBaseManager)
@@ -30,7 +31,7 @@
   (reset! consuming-running? true)
   (thread
     (while @consuming-running?
-      (let [snapshot (<!! dataset/input-chan)
+      (let [snapshot (<!! input-chan)
             image (dataset/create-input-image (drop dataset/PREDICTION-HEAD snapshot))
             dir (io/file root)
             filename "input.png"
@@ -44,4 +45,7 @@
 (defn start! []
   (load-model)
   (start-consumer!)
-  (dataset/start-producer!))
+  ;; we want to continue dataset creation during trading
+  (dataset/init-image-counter)
+  (dataset/start-consumer!)
+  (dataset/start-producer! [dataset/input-chan input-chan]))

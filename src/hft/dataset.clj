@@ -198,7 +198,7 @@
                                             [(->int price) {:qty (parse-double qty)}]))
                                     (into {}))))))
 
-(defn calc-new-state []
+(defn calc-new-state [chs]
   (let [event (api/depth! SYMBOL)]
     (when (> (:lastUpdateId event) (or (:lastUpdateId (last @states)) 0))
       (swap! states (fn [s]
@@ -209,7 +209,8 @@
                           $))))
       (let [snapshot @states]
         (when (= (count snapshot) STATES-MAX-SIZE)
-          (>!! input-chan snapshot))))))
+          (doseq [ch chs]
+            (>!! ch snapshot)))))))
 
 (defn start-consumer! []
   (reset! consuming-running? true)
@@ -239,12 +240,12 @@
 (defn stop-consumer! []
   (reset! consuming-running? false))
 
-(defn start-producer! []
+(defn start-producer! [chs]
   (let [interval 3000]
     (loop [t (System/currentTimeMillis)]
       (let [delta (- (System/currentTimeMillis) t)]
         (if (>= delta interval)
-          (do (calc-new-state)
+          (do (calc-new-state chs)
               (recur (System/currentTimeMillis)))
           (do (Thread/sleep (- interval delta))
               (recur t)))))))
@@ -260,7 +261,7 @@
 (defn prepare! []
   (init-image-counter)
   (start-consumer!)
-  (start-producer!))
+  (start-producer! [input-chan]))
 
 ;(api/init)
 ;(prepare!)
