@@ -1,6 +1,5 @@
 (ns hft.train
-  (:require [clojure.java.io :as io]
-            [hft.gcloud :refer [upload-model!]])
+  (:require [clojure.java.io :as io])
   (:import (ai.djl Model)
            (ai.djl.basicdataset.cv.classification ImageFolder)
            (ai.djl.basicmodelzoo.cv.classification ResNetV1)

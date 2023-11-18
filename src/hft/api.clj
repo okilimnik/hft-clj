@@ -12,9 +12,9 @@
 (defn jread [v]
   (j/read-value v j/keyword-keys-object-mapper))
 
-#_(defn open-order! [params]
-    (-> (.newOrder trade-client params)
-        jread))
+(defn open-order! [params]
+  (-> (.newOrder trade-client params)
+      jread))
 
 (defn init []
   (let [config (:prod (edn/read-string (slurp "binance.config.edn")))]

@@ -1,11 +1,12 @@
 (ns hft.dataset
-  (:require [clojure.core.async :refer [thread <!! >!! chan sliding-buffer]]
+  (:require [clojure.core.async :refer [<!! >!! chan sliding-buffer thread]]
             [clojure.java.io :as io]
             [clojure.math :as math]
             [hft.api :as api]
+            [hft.api :as binance]
+            [hft.gcloud :refer [upload-file!]]
             [mikera.image.core :as i]
-            [taoensso.timbre :as log]
-            [hft.gcloud :refer [upload-file!]])
+            [taoensso.timbre :as log])
   (:import [java.awt Color]))
 
 (def SYMBOL "BTCUSDT")
@@ -259,6 +260,7 @@
     (reset! image-counter init-val)))
 
 (defn prepare! []
+  (binance/init)
   (init-image-counter)
   (start-consumer!)
   (start-producer! [input-chan]))

@@ -1,9 +1,12 @@
 (ns hft.trade
-  (:require [clojure.core.async :refer [<!! thread chan sliding-buffer]]
+  (:require [clojure.string :as str]
+            [clojure.core.async :refer [<!! chan sliding-buffer thread]]
             [clojure.java.io :as io]
             [hft.dataset :as dataset]
             [hft.train :as train]
-            [mikera.image.core :as i])
+            [hft.api :as api]
+            [mikera.image.core :as i]
+            [taoensso.timbre :as log])
   (:import [ai.djl.modality.cv ImageFactory]
            [ai.djl.modality.cv.transform ToTensor]
            [ai.djl.modality.cv.translator ImageClassificationTranslator]
@@ -15,6 +18,50 @@
 (def predictor (atom nil))
 (def consuming-running? (atom false))
 (def input-chan (chan (sliding-buffer 1)))
+(def THRESHOLD 0.96)
+(def TRADE-AMOUNT-USD 500)
+(def TRADE-AMOUNT-BTC 0.01)
+(def PROFIT-USD 40)
+
+;; we want our order not to match any existent order
+;; so it would be a `maker` order (less exchange fee + more profit by default)
+(def ^:private MAKER-ORDER-SHIFT 1)
+
+(defn- get-maker-price [price side]
+  ((case side :buy - +) price MAKER-ORDER-SHIFT))
+
+(defn- get-best-price [side]
+  (let [best-prices (api/best-price!)]
+    (-> (case side :buy :askPrice :bidPrice)
+        best-prices
+        parse-double)))
+
+(defn create-buy-params [{:keys [price]}]
+  {:symbol "BTCUSDT"
+   :side "BUY"
+   :type "LIMIT"
+   :timeInForce "GTC"
+   :quantity TRADE-AMOUNT-BTC
+   :price price})
+
+(defn create-take-profit-params [{:keys [price]}]
+  {:symbol "BTCUSDT"
+   :side "SELL"
+   :type "LIMIT"
+   :timeInForce "GTC"
+   :quantity TRADE-AMOUNT-BTC
+   :price (+ price PROFIT-USD)})
+
+(defn open-order! [side]
+  (let [maker-price (-> (get-best-price side)
+                        (get-maker-price side))]
+    (api/open-order! (create-buy-params {:price maker-price}))
+    (api/open-order! (create-take-profit-params {:price maker-price}))))
+
+(defn trade! [category probability]
+  (when (= category "00000001") ;; buy
+    (when (> probability THRESHOLD)
+      (open-order! :buy))))
 
 (defn load-model []
   (let [_memory-manager (NDManager/newBaseManager)
@@ -39,13 +86,23 @@
         (when-not (.exists dir)
           (.mkdirs dir))
         (i/save image filepath)
-        (let [prediction (.predict @predictor (.fromFile (ImageFactory/getInstance) (Paths/get (.toURI (io/file filepath)))))]
-          (prn-str prediction))))))
+        (let [prediction (.best (.predict @predictor (.fromFile (ImageFactory/getInstance) (Paths/get (.toURI (io/file filepath))))))
+              class! (.getClassName prediction)
+              probability (.getProbability prediction)]
+          (log/debug class! ": " probability)
+          (trade! class! probability))))))
+
+(defn stop-consuming []
+  (reset! consuming-running? false))
+
+;(stop-consuming)
 
 (defn start! []
+  (api/init)
   (load-model)
   (start-consumer!)
   ;; we want to continue dataset creation during trading
-  (dataset/init-image-counter)
-  (dataset/start-consumer!)
-  (dataset/start-producer! [dataset/input-chan input-chan]))
+  ;(dataset/init-image-counter)
+  ;(dataset/start-consumer!)
+  (dataset/start-producer! [;dataset/input-chan 
+                            input-chan]))
