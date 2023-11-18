@@ -1,6 +1,5 @@
 (ns hft.trade
-  (:require [clojure.string :as str]
-            [clojure.core.async :refer [<!! chan sliding-buffer thread]]
+  (:require [clojure.core.async :refer [<!! chan sliding-buffer thread timeout go-loop <!]]
             [clojure.java.io :as io]
             [hft.dataset :as dataset]
             [hft.train :as train]
@@ -14,6 +13,7 @@
            [java.nio.file Paths]
            [java.util Arrays]))
 
+(def SYMBOL dataset/SYMBOL)
 (def root "./trade")
 (def predictor (atom nil))
 (def consuming-running? (atom false))
@@ -22,41 +22,72 @@
 (def TRADE-AMOUNT-USD 500)
 (def TRADE-AMOUNT-BTC 0.01)
 (def PROFIT-USD 40)
+(def LOSS-USD 40)
 
 ;; we want our order not to match any existent order
 ;; so it would be a `maker` order (less exchange fee + more profit by default)
 (def ^:private MAKER-ORDER-SHIFT 1)
 
+(defn stop-consuming []
+  (reset! consuming-running? false))
+
 (defn- get-maker-price [price side]
   ((case side :buy - +) price MAKER-ORDER-SHIFT))
 
 (defn- get-best-price [side]
-  (let [best-prices (api/best-price!)]
+  (let [best-prices (api/best-price! SYMBOL)]
     (-> (case side :buy :askPrice :bidPrice)
         best-prices
         parse-double)))
 
 (defn create-buy-params [{:keys [price]}]
-  {:symbol "BTCUSDT"
-   :side "BUY"
-   :type "LIMIT"
-   :timeInForce "GTC"
-   :quantity TRADE-AMOUNT-BTC
-   :price price})
+  {"symbol" SYMBOL
+   "side" "BUY"
+   "type" "LIMIT"
+   "timeInForce" "GTC"
+   "quantity" TRADE-AMOUNT-BTC
+   "price" price})
 
 (defn create-take-profit-params [{:keys [price]}]
-  {:symbol "BTCUSDT"
-   :side "SELL"
-   :type "LIMIT"
-   :timeInForce "GTC"
-   :quantity TRADE-AMOUNT-BTC
-   :price (+ price PROFIT-USD)})
+  {"symbol" SYMBOL
+   "side" "SELL"
+   "type" "LIMIT"
+   "timeInForce" "GTC"
+   "quantity" TRADE-AMOUNT-BTC
+   "price" (+ price PROFIT-USD)})
+
+(defn create-stop-loss-params [{:keys [price]}]
+  {"symbol" SYMBOL
+   "side" "SELL"
+   "type" "LIMIT"
+   "timeInForce" "GTC"
+   "quantity" TRADE-AMOUNT-BTC
+   "price" (- price LOSS-USD)})
 
 (defn open-order! [side]
-  (let [maker-price (-> (get-best-price side)
-                        (get-maker-price side))]
-    (api/open-order! (create-buy-params {:price maker-price}))
-    (api/open-order! (create-take-profit-params {:price maker-price}))))
+  (let [opened-orders (api/opened-orders! SYMBOL)]
+    (when (empty? opened-orders)
+      (let [maker-price (-> (get-best-price side)
+                            (get-maker-price side))]
+        (api/open-order! (create-buy-params {:price maker-price}))
+        (loop []
+          (<!! (timeout 3000))
+          (let [opened-orders (api/opened-orders! SYMBOL)]
+            (cond
+              ;; buy limit order was triggered
+              (empty? opened-orders)
+              (do (api/open-order! (create-take-profit-params {:price maker-price}))
+                  (api/open-order! (create-stop-loss-params {:price maker-price}))
+                  (recur))
+
+              ;; stop loss or take-profit was triggered and only the counter-order left, so we close it
+              (and (= (count opened-orders) 1)
+                   (= (get-in opened-orders [0 "side"]) "SELL"))
+              (api/cancel-order! SYMBOL (get-in opened-orders [0 "orderId"]))
+
+              ;; otherwise we're waiting for stop profit or stop loss to be triggered
+              :else
+              (recur))))))))
 
 (defn trade! [category probability]
   (when (= category "00000001") ;; buy
@@ -87,13 +118,10 @@
           (.mkdirs dir))
         (i/save image filepath)
         (let [prediction (.best (.predict @predictor (.fromFile (ImageFactory/getInstance) (Paths/get (.toURI (io/file filepath))))))
-              class! (.getClassName prediction)
+              category (.getClassName prediction)
               probability (.getProbability prediction)]
-          (log/debug class! ": " probability)
-          (trade! class! probability))))))
-
-(defn stop-consuming []
-  (reset! consuming-running? false))
+          (log/debug category ": " probability)
+          (trade! category probability))))))
 
 ;(stop-consuming)
 

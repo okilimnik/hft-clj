@@ -2,9 +2,9 @@
   (:require [jsonista.core :as j]
             [clojure.core.async :refer [go]]
             [clojure.edn :as edn])
-  (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]))
+  (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]
+           (com.binance.connector.client.impl.spot Trade)))
 
-(def SYMBOL "BTCTUSD")
 (def trade-client (atom nil))
 (def market-client (atom nil))
 (def ws-client (atom nil))
@@ -13,7 +13,18 @@
   (j/read-value v j/keyword-keys-object-mapper))
 
 (defn open-order! [params]
-  (-> (.newOrder trade-client params)
+  (-> (.newOrder @trade-client params)
+      jread))
+
+(defn opened-orders! [symbol]
+  (-> (.getOpenOrders @trade-client {"symbol" symbol
+                                     "timestamp" (System/currentTimeMillis)})
+      jread))
+
+(defn cancel-order! [symbol id]
+  (-> (.cancelOrder @trade-client {"symbol" symbol
+                                   "orderId" id
+                                   "timestamp" (System/currentTimeMillis)})
       jread))
 
 (defn init []
@@ -26,17 +37,7 @@
   (-> (.depth @market-client {"symbol" symbol "limit" 5000})
       jread))
 
-(defn trades! []
+(defn best-price! [symbol]
   (go
-    (-> (.trades @market-client {"symbol" SYMBOL})
-        jread)))
-
-(defn best-price! []
-  (go
-    (-> (.bookTicker @market-client {"symbol" SYMBOL})
-        jread)))
-
-(defn ticker! [& [params]]
-  (go
-    (-> (.ticker @market-client (merge {"symbol" SYMBOL} params))
+    (-> (.bookTicker @market-client {"symbol" symbol})
         jread)))
