@@ -1,27 +1,45 @@
 (ns hft.trade
-  (:require [clojure.core.async :refer [thread <!!]]
+  (:require [clojure.core.async :refer [<!! thread]]
             [clojure.java.io :as io]
-            [mikera.image.core :as i]
             [hft.dataset :as dataset]
-            [hft.train :as train]) 
-  (:import [ai.djl.ndarray NDManager]))
+            [hft.train :as train]
+            [mikera.image.core :as i])
+  (:import [ai.djl.modality.cv ImageFactory]
+           [ai.djl.modality.cv.transform ToTensor]
+           [ai.djl.modality.cv.translator ImageClassificationTranslator]
+           [ai.djl.ndarray NDManager]
+           [java.nio.file Paths]
+           [java.util Arrays]))
 
-(def model (atom nil))
+(def root "./trade")
+(def predictor (atom nil))
+(def consuming-running? (atom false))
 
 (defn load-model []
-  (let [_memory-manager (NDManager/newBaseManager)]
-    (reset! model (train/load-model))))
+  (let [_memory-manager (NDManager/newBaseManager)
+        model (train/load-model)
+        classes (Arrays/asList (into-array ["10000000" "00000001"]))
+        translator (.build
+                    (doto (ImageClassificationTranslator/builder)
+                      (.addTransform (ToTensor.))
+                      (.optSynset classes)
+                      (.optApplySoftmax true)))]
+    (reset! predictor (.newPredictor model translator))))
 
 (defn start-consumer! []
+  (reset! consuming-running? true)
   (thread
-    (let [snapshot (<!! dataset/input-chan)
-          image (dataset/create-input-image (drop dataset/PREDICTION-HEAD snapshot))
-          dir (io/file "./trade")
-          filename "input.png"
-          filepath (str "./trade/" filename)]
-      (when-not (.exists dir)
-        (.mkdirs dir))
-      (i/save image filepath))))
+    (while @consuming-running?
+      (let [snapshot (<!! dataset/input-chan)
+            image (dataset/create-input-image (drop dataset/PREDICTION-HEAD snapshot))
+            dir (io/file root)
+            filename "input.png"
+            filepath (str root "/" filename)]
+        (when-not (.exists dir)
+          (.mkdirs dir))
+        (i/save image filepath)
+        (let [prediction (.predict @predictor (.fromFile (ImageFactory/getInstance) (Paths/get (.toURI (io/file filepath)))))]
+          (prn-str prediction))))))
 
 (defn start! []
   (load-model)
