@@ -218,17 +218,29 @@
       (let [snapshot (<!! input-chan)]
         (try
           (let [image (create-input-image (take INPUT-SIZE snapshot))
-                label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))
-                dir (io/file "./dataset")]
+                label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))]
             (log/debug "Created and labeled input data " (if (= label "00000000") "as noise" "as valid"))
-            (when (not= label "00000000")
-              (when-not (.exists dir)
-                (.mkdirs dir))
-              (let [filename (str label "_" (get-image-number!) ".png")
-                    filepath (str "./dataset/" filename)]
-                (i/save image filepath)
-                (upload-file! filename filepath)
-                (io/delete-file filepath))))
+            (when (or (= label "10000000")
+                      (= label "00000001"))
+
+              ;; save file for training
+              (let [train-dir (io/file "./dataset")]
+                (when-not (.exists train-dir)
+                  (.mkdirs train-dir))
+                (let [train-filename (str label "_" (get-image-number!) ".png")
+                      train-filepath (str "./dataset/" train-filename)]
+                  (i/save image train-filepath)
+                  (upload-file! train-filename train-filepath)
+                  (io/delete-file train-filepath)))
+
+              ;; save file for trading
+              (let [trade-dir (io/file "./trade")]
+                (when-not (.exists trade-dir)
+                  (.mkdirs trade-dir))
+                (let [trade-filename (str label ".png")
+                      trade-filepath (str "./trade/" trade-filename)]
+                  (i/save image trade-filepath)))))
+          
           (catch Exception e
             (stop-producer!)
             (log/error e)))))))

@@ -10,7 +10,6 @@ pom.xml
 /.vscode
 /dataset
 /test
-/models
 .nrepl-port
 /.idea
 *.iml

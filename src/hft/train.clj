@@ -26,6 +26,10 @@
 (def NUM-CATEGORIES 2)
 (def MODEL-NAME "cnn")
 (def MODEL-FOLDER "./model")
+(def MODEL-OPTIONS {:img-opts {:width IMAGE-SIZE
+                               :height IMAGE-SIZE
+                               :num-chan IMAGE-NUM-CHAN}
+                    :num-categories NUM-CATEGORIES})
 
 (defn create-resnet-block [{:keys [num-categories img-opts]}]
   (.build
@@ -48,20 +52,14 @@
     (.prepare dataset)
     dataset))
 
-(defn load-model [options]
-  (doto (get-model options)
+(defn load-model []
+  (doto (get-model MODEL-OPTIONS)
     (.load (Paths/get (.toURI (io/file MODEL-FOLDER))))))
 
-(defn run []
+(defn start! []
   (let [_memory-manager (NDManager/newBaseManager)
-        model (get-model {:img-opts {:width IMAGE-SIZE
-                                     :height IMAGE-SIZE
-                                     :num-chan IMAGE-NUM-CHAN}
-                          :num-categories NUM-CATEGORIES})
-        #_(load-model {:img-opts {:width IMAGE-SIZE
-                                  :height IMAGE-SIZE
-                                  :num-chan IMAGE-NUM-CHAN}
-                       :num-categories NUM-CATEGORIES})
+        model (get-model MODEL-OPTIONS)       
+        ;model (load-model)
         loss (Loss/softmaxCrossEntropyLoss)
         lrt (Tracker/fixed lr)
         sgd (-> (Optimizer/sgd)
@@ -80,6 +78,5 @@
     (EasyTrain/fit trainer epochs train-set test-set)
     ;(prn (.getTrainingResult trainer))
     (.setProperty model "Epoch" (str epochs))
-    (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME)
-    (upload-model! MODEL-FOLDER)))
+    (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME)))
 

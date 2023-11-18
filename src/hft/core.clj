@@ -4,15 +4,16 @@
             [clojure.tools.cli :refer [parse-opts]]
             [hft.api :as binance]
             [hft.dataset :as dataset]
-            [hft.train :as train]))
+            [hft.train :as train]
+            [hft.trade :as trade]))
 
 (def cli-options
   [["-d" "--dataset" "Prepare dataset"
     :id :dataset]
-   ["-t" "--train" "Train"
-    :id :train]
-   ["-a" "--alerts" "Run alerts"
-    :id :alerts]])
+   ["-n" "--network" "Train network"
+    :id :network]
+   ["-t" "--trade" "Trade"
+    :id :trade]])
 
 (defn error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
@@ -24,5 +25,6 @@
       errors (println (error-msg errors))
       (:dataset options) (do (binance/init)
                              (dataset/prepare!))
-      (:train options) (train/run)
+      (:network options) (train/start!)
+      (:trade options) (trade/start!)
       :else (println "No command provided, exiting..."))))

@@ -11,15 +11,7 @@
 (defn upload-file! [filename filepath]
   (try
     (when-not @storage (init!))
-    (let [blob-id (BlobId/of bucket-name (str "order_book10/" filename))
-          blob-info (.build (BlobInfo/newBuilder blob-id))]
-      (.createFrom @storage blob-info (io/input-stream (io/file filepath)) (into-array Storage$BlobWriteOption [])))
-    (catch Exception e (prn e))))
-
-(defn upload-model! [model-folder]
-  #_(try
-    (when-not @storage (init!))
-    (let [blob-id (BlobId/of bucket-name (str "model/" filename))
+    (let [blob-id (BlobId/of bucket-name (str "order_book11/" filename))
           blob-info (.build (BlobInfo/newBuilder blob-id))]
       (.createFrom @storage blob-info (io/input-stream (io/file filepath)) (into-array Storage$BlobWriteOption [])))
     (catch Exception e (prn e))))
