@@ -34,7 +34,7 @@
   (.build
    (doto (ResNetV1/builder)
      (.setImageShape (Shape. (Arrays/asList (into-array [(:num-chan img-opts) (:width img-opts) (:height img-opts)]))))
-     (.setNumLayers 18)
+     (.setNumLayers 50)
      (.setOutSize num-categories))))
 
 (defn get-model [options]

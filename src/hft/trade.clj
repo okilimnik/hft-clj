@@ -1,5 +1,5 @@
 (ns hft.trade
-  (:require [clojure.core.async :refer [<!! chan sliding-buffer thread timeout go-loop <!]]
+  (:require [clojure.core.async :refer [<!! chan sliding-buffer thread timeout]]
             [clojure.java.io :as io]
             [hft.dataset :as dataset]
             [hft.train :as train]
@@ -89,21 +89,26 @@
               :else
               (recur))))))))
 
-(defn trade! [category probability]
-  (when (= category "00000001") ;; buy
-    (when (> probability THRESHOLD)
-      (open-order! :buy))))
+(defn trade? [[buy wait]]
+  (and (> (.getProbability buy) 4)
+       (< (.getProbability wait) -3)))
+
+(defn trade! [prediction]
+  (when (trade? prediction)
+    (open-order! :buy)))
 
 (defn load-model []
   (let [_memory-manager (NDManager/newBaseManager)
         model (train/load-model)
-        classes (Arrays/asList (into-array ["10000000" "00000001"]))
+        classes (Arrays/asList (into-array ["buy" "wait"]))
         translator (.build
                     (doto (ImageClassificationTranslator/builder)
                       (.addTransform (ToTensor.))
-                      (.optSynset classes)
-                      (.optApplySoftmax true)))]
+                      (.optSynset classes)))]
     (reset! predictor (.newPredictor model translator))))
+
+(defn get-prediction! [filepath]
+  (.items (.predict @predictor (.fromFile (ImageFactory/getInstance) (Paths/get (.toURI (io/file filepath)))))))
 
 (defn start-consumer! []
   (reset! consuming-running? true)
@@ -117,7 +122,7 @@
         (when-not (.exists dir)
           (.mkdirs dir))
         (i/save image filepath)
-        (let [prediction (.best (.predict @predictor (.fromFile (ImageFactory/getInstance) (Paths/get (.toURI (io/file filepath))))))
+        (let [prediction (get-prediction! filepath)
               category (.getClassName prediction)
               probability (.getProbability prediction)]
           (log/debug category ": " probability)
@@ -130,7 +135,7 @@
   (load-model)
   (start-consumer!)
   ;; we want to continue dataset creation during trading
-  ;(dataset/init-image-counter)
-  ;(dataset/start-consumer!)
-  (dataset/start-producer! [;dataset/input-chan 
+  (dataset/init-image-counter)
+  (dataset/start-consumer!)
+  (dataset/start-producer! [dataset/input-chan
                             input-chan]))

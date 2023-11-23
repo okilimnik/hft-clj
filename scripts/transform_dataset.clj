@@ -4,13 +4,13 @@
 (def categories #{"10000000"
                   "01000000"
                   "00100000"
-                 ; "00010000"
-                 ; "00001000"
+                  "00010000"
+                  "00001000"
                   "00000100"
                   "00000010"
                   "00000001"})
 
-(def folder (io/file "./dataset/order_book8"))
+(def folder (io/file "./dataset/order_book10"))
 (def files (file-seq folder))
 
 (defn move-file [source-file dest-path]
@@ -24,7 +24,7 @@
     (when (contains? categories category)
       (when-not (.exists dest-folder)
         (.mkdirs dest-folder))
-      (move-file file (str "./dataset/" category "/2_" filename))
+      (move-file file (str "./dataset/" category "/" filename))
       #_(io/delete-file file))))
 
 ;; clj scripts/transform_dataset.clj
