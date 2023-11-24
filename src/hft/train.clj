@@ -1,5 +1,6 @@
 (ns hft.train
-  (:require [clojure.java.io :as io])
+  (:require [clojure.java.io :as io]
+            [hft.gcloud :refer [upload-model!]])
   (:import (ai.djl Model)
            (ai.djl.basicdataset.cv.classification ImageFolder)
            (ai.djl.basicmodelzoo.cv.classification ResNetV1)
@@ -18,7 +19,7 @@
            (java.util Arrays)))
 
 (def lr 0.005)
-(def epochs 46)
+(def epochs 20)
 (def batch-size 20)
 (def IMAGE-SIZE 60)
 (def IMAGE-NUM-CHAN 3)
@@ -57,7 +58,7 @@
 
 (defn start! []
   (let [_memory-manager (NDManager/newBaseManager)
-        model (get-model MODEL-OPTIONS)       
+        model (get-model MODEL-OPTIONS)
         ;model (load-model)
         loss (Loss/softmaxCrossEntropyLoss)
         lrt (Tracker/fixed lr)
@@ -77,5 +78,10 @@
     (EasyTrain/fit trainer epochs train-set test-set)
     ;(prn (.getTrainingResult trainer))
     (.setProperty model "Epoch" (str epochs))
-    (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME)))
+    (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME)
+    (let [file (->> (file-seq (io/file MODEL-FOLDER))
+                    (remove #(.isDirectory %))
+                    (sort-by #(.lastModified %))
+                    last)]
+      (upload-model! (.getName file) (.getAbsolutePath file)))))
 

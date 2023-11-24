@@ -6,7 +6,7 @@ COPY image-counter.txt ./
 ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
 # w/o specifing GC and with 8gb memory it takes ~ 300ms to denoise
 # need to check what time is with ZGC?
-CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-t"]
+CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-n"]
 
 # docker build -t neusa .
 # docker tag neusa asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest
