@@ -20,7 +20,7 @@
 
 (def lr 0.005)
 (def epochs 20)
-(def batch-size 20)
+(def batch-size 100)
 (def IMAGE-SIZE 60)
 (def IMAGE-NUM-CHAN 3)
 (def NUM-CATEGORIES 2)
@@ -79,6 +79,7 @@
     ;(prn (.getTrainingResult trainer))
     (.setProperty model "Epoch" (str epochs))
     (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME)
+    (.close model)
     (let [file (->> (file-seq (io/file MODEL-FOLDER))
                     (remove #(.isDirectory %))
                     (sort-by #(.lastModified %))

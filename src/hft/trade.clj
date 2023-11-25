@@ -122,11 +122,9 @@
         (when-not (.exists dir)
           (.mkdirs dir))
         (i/save image filepath)
-        (let [prediction (get-prediction! filepath)
-              category (.getClassName prediction)
-              probability (.getProbability prediction)]
-          (log/debug category ": " probability)
-          (trade! category probability))))))
+        (let [prediction (get-prediction! filepath)]
+          (log/debug prediction ": " prediction)
+          (trade! prediction))))))
 
 ;(stop-consuming)
 
