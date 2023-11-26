@@ -18,7 +18,7 @@
 (def predictor (atom nil))
 (def consuming-running? (atom false))
 (def input-chan (chan (sliding-buffer 1)))
-(def TRADE-AMOUNT-BTC 0.01)
+(def TRADE-AMOUNT-BTC 0.005)
 (def PROFIT-USD 48)
 (def LOSS-USD 48)
 
