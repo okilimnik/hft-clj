@@ -18,20 +18,14 @@
 (def predictor (atom nil))
 (def consuming-running? (atom false))
 (def input-chan (chan (sliding-buffer 1)))
-(def THRESHOLD 0.96)
-(def TRADE-AMOUNT-USD 500)
 (def TRADE-AMOUNT-BTC 0.01)
-(def PROFIT-USD 40)
-(def LOSS-USD 40)
+(def PROFIT-USD 48)
+(def LOSS-USD 48)
 
 ;; we want our order not to match any existent order
 ;; so it would be a `maker` order (less exchange fee + more profit by default)
-(def ^:private MAKER-ORDER-SHIFT 1)
-
-(defn stop-consuming []
-  (reset! consuming-running? false))
-
-(defn- get-maker-price [price side]
+#_(def ^:private MAKER-ORDER-SHIFT 1)
+#_(defn- get-maker-price [price side]
   ((case side :buy - +) price MAKER-ORDER-SHIFT))
 
 (defn- get-best-price [side]
@@ -134,8 +128,6 @@
         (let [prediction (get-prediction! filepath)]
           (log/debug prediction ": " prediction)
           (trade! prediction))))))
-
-;(stop-consuming)
 
 (defn start! []
   (api/init)

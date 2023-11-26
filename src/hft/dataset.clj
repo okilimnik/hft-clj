@@ -3,7 +3,6 @@
             [clojure.java.io :as io]
             [clojure.math :as math]
             [hft.api :as api]
-            [hft.api :as binance]
             [hft.gcloud :refer [upload-file!]]
             [mikera.image.core :as i]
             [taoensso.timbre :as log])
@@ -16,7 +15,6 @@
 (def LEVEL-PRICE-CHANGE-PERCENT 0.04)
 (def BTC-TRADING-AMOUNT 0.02)
 (def STATES-MAX-SIZE (+ INPUT-SIZE PREDICTION-HEAD))
-(def api-stream-id (atom nil))
 ;; using vector for states (and subvec fn) causes HeapOutOfMemory errors
 (def states (atom clojure.lang.PersistentQueue/EMPTY))
 (def MAX-PRICE-INTERVAL-ADDITION 0.1)
@@ -30,9 +28,6 @@
   (let [new-val (swap! image-counter inc)]
     (spit image-counter-file (str new-val))
     new-val))
-
-(defn stop-producer! []
-  (.closeConnection @api/ws-client @api-stream-id))
 
 (defn ->image
   "int[] pixels - 1-dimensional Java array, which length is width * height"
@@ -235,11 +230,7 @@
                     (io/delete-file train-filepath)))))
             
             (catch Exception e
-              (stop-producer!)
               (log/error e))))))))
-
-(defn stop-consumer! []
-  (reset! consuming-running? false))
 
 (defn start-producer! [chs]
   (let [interval 3000]
@@ -260,7 +251,7 @@
     (reset! image-counter init-val)))
 
 (defn prepare! []
-  (binance/init)
+  (api/init)
   (init-image-counter)
   (start-consumer!)
   (start-producer! [input-chan]))
