@@ -1,0 +1,17 @@
+FROM ghcr.io/graalvm/graalvm-community:21
+
+COPY target/uberjar/app.jar ./
+COPY binance.config.edn ./
+COPY gcp.json ./
+COPY image-counter.txt ./
+COPY model ./model
+ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
+CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-t"]
+
+# docker build -f Dockerfile.trade -t neusa-trade .
+# docker tag neusa-trade asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest
+# docker push asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft
+
+# docker run -it --rm --memory=8000m --cpus=1 --name neusa-trade neusa-trade
+
+# GOOGLE_APPLICATION_CREDENTIALS=/Users/okilimnik/Projects/hft-clj/gcp.json lein run -n

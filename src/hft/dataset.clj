@@ -209,34 +209,34 @@
                           (pop $)
                           $))))
       (let [snapshot @states]
-        (when (= (count snapshot) STATES-MAX-SIZE)
-          (doseq [ch chs]
-            (>!! ch snapshot)))))))
+        (doseq [ch chs]
+          (>!! ch snapshot))))))
 
 (defn start-consumer! []
   (reset! consuming-running? true)
   (thread
     (while @consuming-running?
       (let [snapshot (<!! input-chan)]
-        (try
-          (let [image (create-input-image (take INPUT-SIZE snapshot))
-                label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))]
-            (log/debug "Created and labeled input data " (if (= label "00000000") "as noise" "as valid"))
-            (when (or (= label "10000000")
-                      (= label "00000001"))
+        (when (= (count snapshot) STATES-MAX-SIZE)
+          (try
+            (let [image (create-input-image (take INPUT-SIZE snapshot))
+                  label (calc-label (nth snapshot (dec INPUT-SIZE)) (drop INPUT-SIZE snapshot))]
+              (log/debug "Created and labeled input data " (if (= label "00000000") "as noise" "as valid"))
+              (when (or (= label "10000000")
+                        (= label "00000001"))
 
-              (let [train-dir (io/file "./dataset")]
-                (when-not (.exists train-dir)
-                  (.mkdirs train-dir))
-                (let [train-filename (str label "_" (get-image-number!) ".png")
-                      train-filepath (str "./dataset/" train-filename)]
-                  (i/save image train-filepath)
-                  (upload-file! train-filename train-filepath)
-                  (io/delete-file train-filepath)))))
-          
-          (catch Exception e
-            (stop-producer!)
-            (log/error e)))))))
+                (let [train-dir (io/file "./dataset")]
+                  (when-not (.exists train-dir)
+                    (.mkdirs train-dir))
+                  (let [train-filename (str label "_" (get-image-number!) ".png")
+                        train-filepath (str "./dataset/" train-filename)]
+                    (i/save image train-filepath)
+                    (upload-file! train-filename train-filepath)
+                    (io/delete-file train-filepath)))))
+            
+            (catch Exception e
+              (stop-producer!)
+              (log/error e))))))))
 
 (defn stop-consumer! []
   (reset! consuming-running? false))

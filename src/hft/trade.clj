@@ -65,10 +65,13 @@
    "price" (- price LOSS-USD)})
 
 (defn open-order! [side]
+  (log/debug "open-order! triggered")
   (let [opened-orders (api/opened-orders! SYMBOL)]
     (when (empty? opened-orders)
+      (log/debug "no open orders so we can trade")
       (let [maker-price (-> (get-best-price side)
-                            (get-maker-price side))]
+                            #_(get-maker-price side))]
+        (log/debug "trying to buy at maker-price")
         (api/open-order! (create-buy-params {:price maker-price}))
         (loop []
           (<!! (timeout 3000))
@@ -76,18 +79,24 @@
             (cond
               ;; buy limit order was triggered
               (empty? opened-orders)
-              (do (api/open-order! (create-take-profit-params {:price maker-price}))
-                  (api/open-order! (create-stop-loss-params {:price maker-price}))
-                  (recur))
+              (do
+                (log/debug "we successfully bought, creating stop loss/profit orders")
+                (api/open-order! (create-take-profit-params {:price maker-price}))
+                (api/open-order! (create-stop-loss-params {:price maker-price}))
+                (recur))
 
               ;; stop loss or take-profit was triggered and only the counter-order left, so we close it
               (and (= (count opened-orders) 1)
                    (= (get-in opened-orders [0 "side"]) "SELL"))
-              (api/cancel-order! SYMBOL (get-in opened-orders [0 "orderId"]))
+              (do
+                (log/debug "stop loss or take-profit was triggered and only the counter-order left, so we close it, and can analyse inputs again")
+                (api/cancel-order! SYMBOL (get-in opened-orders [0 "orderId"])))
 
               ;; otherwise we're waiting for stop profit or stop loss to be triggered
               :else
-              (recur))))))))
+              (do
+                (log/debug "we're waiting for stop profit or stop loss to be triggered, we don't analyse inputs in this state, only 1 trade at a time")
+                (recur)))))))))
 
 (defn trade? [[buy wait]]
   (and (> (.getProbability buy) 4)
