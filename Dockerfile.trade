@@ -14,4 +14,4 @@ CMD ["java", "-XX:+UseZGC", "-jar", "app.jar", "-t"]
 
 # docker run -it --rm --memory=8000m --cpus=1 --name neusa-trade neusa-trade
 
-# GOOGLE_APPLICATION_CREDENTIALS=/Users/okilimnik/Projects/hft-clj/gcp.json lein run -n
+# GOOGLE_APPLICATION_CREDENTIALS=./gcp.json lein run -t
