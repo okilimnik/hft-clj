@@ -9,6 +9,7 @@
   (:import [java.awt Color]))
 
 (def SYMBOL "BTCUSDT")
+(def TIME-INTERVAL-MILLIS 5000)
 (def DECIMALS 2)
 (def INPUT-SIZE 60)
 (def PREDICTION-HEAD 10)
@@ -232,14 +233,13 @@
             (log/error e)))))))
 
 (defn start-producer! [chs]
-  (let [interval 3000]
-    (loop [t (System/currentTimeMillis)]
-      (let [delta (- (System/currentTimeMillis) t)]
-        (if (>= delta interval)
-          (do (calc-new-state chs)
-              (recur (System/currentTimeMillis)))
-          (do (Thread/sleep (- interval delta))
-              (recur t)))))))
+  (loop [t (System/currentTimeMillis)]
+    (let [delta (- (System/currentTimeMillis) t)]
+      (if (>= delta TIME-INTERVAL-MILLIS)
+        (do (calc-new-state chs)
+            (recur (System/currentTimeMillis)))
+        (do (Thread/sleep (- TIME-INTERVAL-MILLIS delta))
+            (recur t))))))
 
 (defn init-image-counter []
   (let [init-val (parse-long
