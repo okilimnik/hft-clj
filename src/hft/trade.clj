@@ -3,7 +3,7 @@
             [clojure.java.io :as io]
             [hft.dataset :as dataset]
             [hft.train :as train]
-            [hft.api :as api]
+            [hft.binance :as api]
             [mikera.image.core :as i]
             [taoensso.timbre :as log])
   (:import [ai.djl.modality.cv ImageFactory]
@@ -132,9 +132,4 @@
 (defn start! []
   (api/init)
   (load-model)
-  (start-consumer!)
-  ;; we want to continue dataset creation during trading
-  (dataset/init-image-counter)
-  (dataset/start-consumer!)
-  (dataset/start-producer! [dataset/input-chan
-                            input-chan]))
+  (start-consumer!))
