@@ -118,7 +118,7 @@
   (thread
     (while @consuming-running?
       (let [snapshot (<!! input-chan)
-            image (dataset/create-input-image (drop dataset/PREDICTION-HEAD snapshot))
+            image nil #_(dataset/create-input-image (drop dataset/PREDICTION-HEAD snapshot))
             dir (io/file root)
             filename "input.png"
             filepath (str root "/" filename)]
