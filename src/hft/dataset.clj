@@ -1,19 +1,37 @@
 (ns hft.dataset
   (:require [hft.binance :as bi]
             [hft.data :as du]
-            [hft.scheduler :as scheduler]
-            [clojure.string :as s]))
+            [hft.scheduler :as scheduler]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
-(def LABEL-QUEUE-SIZE 8)
+(def LABEL-QUEUE-SIZE 6)
 (def MAX-QUANTITY 50)
+(def PRICE-INTERVAL-FOR-INDEXING 5)
+(def TRADING-QTY 0.05)
+(def OPEN-ORDER-LAG 0.5)
 (def PROFIT 40)
+
+(defn find-first [pred getter s]
+  (loop [s' s]
+    (let [el (first s')]
+      (if (pred el)
+        (getter el)
+        (recur (rest s'))))))
+
+(defn find-trade-price [prices]
+  (find-first #(>= (parse-double (second %)) (+ TRADING-QTY OPEN-ORDER-LAG)) #(parse-double (first %)) prices))
 
 (defn calc-label [order-books]
   (let [current (first order-books)
-        next (drop 1 order-books)]
-    (throw (ex-info "Test error" {}))))
+        nexts (drop 1 order-books)
+        buy-price (find-trade-price (:asks current))
+        sell-price (find-trade-price (:bids current))
+        buy-profit-price (+ buy-price PROFIT)
+        sell-profit-price (- sell-price PROFIT)]
+    (cond
+      (some #(>= % buy-profit-price) (map (comp find-trade-price :bids) nexts)) :buy
+      (some #(<= % sell-profit-price) (map (comp find-trade-price :asks) nexts)) :sell)))
 
 (defn get-price-level [price interval]
   (-> (/ price interval)
@@ -24,7 +42,7 @@
   (let [index (/ (- level min-level) price-interval)]
     index))
 
-(defn order-book->quantities-by-price-level [price-interval order-book]
+(defn order-book->quantities-indexed-by-price-level [price-interval order-book]
   (concat
    (let [max-bid (parse-double (ffirst (:bids order-book)))
          max-level (get-price-level max-bid price-interval)
@@ -61,7 +79,7 @@
      (fn []
        (let [order-book (bi/depth! SYMBOL 1000)]
          (swap! input #(as-> % $
-                         (conj $ (order-book->quantities-by-price-level 5 order-book))
+                         (conj $ (order-book->quantities-indexed-by-price-level PRICE-INTERVAL-FOR-INDEXING order-book))
                          (if (> (count $) (dec (+ INPUT-SIZE LABEL-QUEUE-SIZE)))
                            (pop $)
                            $)))
