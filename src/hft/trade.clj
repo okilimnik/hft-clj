@@ -3,7 +3,7 @@
             [clojure.java.io :as io]
             [hft.dataset :as dataset]
             [hft.train :as train]
-            [hft.binance :as api]
+            [hft.market.binance :as api]
             [mikera.image.core :as i]
             [taoensso.timbre :as log])
   (:import [ai.djl.modality.cv ImageFactory]

@@ -1,4 +1,4 @@
-(ns hft.binance
+(ns hft.market.binance
   (:require [jsonista.core :as j]
             [clojure.edn :as edn])
   (:import [com.binance.connector.client.impl SpotClientImpl]))

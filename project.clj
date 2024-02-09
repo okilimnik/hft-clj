@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [org.clojure/core.async "1.6.681"]
                  [org.clojure/tools.cli "1.0.219"]
+                 [clj-http "3.12.3"]
                  [metosin/jsonista "0.3.8"]
                  [com.taoensso/timbre "6.3.1"]
                  [com.fzakaria/slf4j-timbre "0.4.0"]

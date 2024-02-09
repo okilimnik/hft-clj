@@ -1,5 +1,5 @@
 (ns hft.dataset
-  (:require [hft.binance :as bi]
+  (:require [hft.market.binance :as bi]
             [hft.data :as du]
             [hft.scheduler :as scheduler]))
 
