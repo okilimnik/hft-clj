@@ -25,19 +25,26 @@
   "int[] pixels - 1-dimensional Java array, which length is width * height"
   [{:keys [data max-value min-value] :or {min-value 0}}]
   (let [width (count data)
-        height (count (first data))
+        height (count (:r (first data)))
         image (i/new-image width height)
         pixels (i/get-pixels image)
         scale (/ 255.0 (- max-value min-value))]
     (dotimes [idx (* width height)]
-      (let [width-idx (/ idx width)
-            height-idx (mod idx width)
-            color (* scale (get-in data [width-idx height-idx]))]
+      (let [height-idx (int (/ idx width))
+            width-idx (mod idx width)
+            r (-> (nth data width-idx)
+                  :r
+                  (nth height-idx)
+                  (min max-value))
+            g (-> (nth data width-idx)
+                  :g
+                  (nth height-idx)
+                  (min max-value))]
         (aset pixels idx
               (.getRGB (Color.
-                        (long color)
-                        (long color)
-                        (long color))))))
+                        (long (* scale r))
+                        (long (* scale g))
+                        (long 255))))))
     (i/set-pixels image pixels)
     image))
 

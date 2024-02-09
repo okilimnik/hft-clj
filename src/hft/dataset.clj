@@ -30,8 +30,9 @@
         buy-profit-price (+ buy-price PROFIT)
         sell-profit-price (- sell-price PROFIT)]
     (cond
-      (some #(>= % buy-profit-price) (map (comp find-trade-price :bids) nexts)) :buy
-      (some #(<= % sell-profit-price) (map (comp find-trade-price :asks) nexts)) :sell)))
+      (some #(>= % buy-profit-price) (map (comp find-trade-price :bids) nexts)) "buy"
+      (some #(<= % sell-profit-price) (map (comp find-trade-price :asks) nexts)) "sell"
+      :else "wait")))
 
 (defn get-price-level [price interval]
   (-> (/ price interval)
@@ -43,33 +44,37 @@
     index))
 
 (defn order-book->quantities-indexed-by-price-level [price-interval order-book]
-  (concat
-   (let [max-bid (parse-double (ffirst (:bids order-book)))
-         max-level (get-price-level max-bid price-interval)
-         min-level (- max-level (* price-interval (dec (/ INPUT-SIZE 2))))
-         result (loop [s (:bids order-book)
-                       result (vec (repeat (/ INPUT-SIZE 2) 0))]
-                  (let [[price-str qty-str] (first s)
-                        price (parse-double price-str)
-                        qty (parse-double qty-str)]
-                    (if (>= price min-level)
-                      (let [level (get-price-level price price-interval)]
-                        (recur (rest s) (update result (get-price-level-index level min-level price-interval) #(+ (or % 0) qty))))
-                      result)))]
-     result)
-   (let [min-ask (parse-double (ffirst (:asks order-book)))
-         min-level (get-price-level min-ask price-interval)
-         max-level (+ min-level (* price-interval (/ INPUT-SIZE 2)))
-         result (loop [s (:asks order-book)
-                       result (vec (repeat (/ INPUT-SIZE 2) 0))]
-                  (let [[price-str qty-str] (first s)
-                        price (parse-double price-str)
-                        qty (parse-double qty-str)]
-                    (if (< price max-level)
-                      (let [level (get-price-level price price-interval)]
-                        (recur (rest s) (update result (get-price-level-index level min-level price-interval) #(+ (or % 0) qty))))
-                      result)))]
-     result)))
+  (let [max-bid (parse-double (ffirst (:bids order-book)))
+        level-10 (get-price-level max-bid price-interval)
+        min-level (- level-10 (* price-interval (dec (/ INPUT-SIZE 2))))
+        max-level (+ level-10 (* price-interval (dec (/ INPUT-SIZE 2))) price-interval)]
+    {:r (let [result (loop [s (:bids order-book)
+                            result (vec (repeat INPUT-SIZE 0))]
+                       (let [[price-str qty-str] (first s)
+                             price (parse-double price-str)
+                             qty (parse-double qty-str)]
+                         (if (>= price min-level)
+                           (let [level (get-price-level price price-interval)]
+                             (recur (rest s) (if (< price max-level)
+                                               (update result (get-price-level-index level min-level price-interval) #(+ (or % 0) qty))
+                                               result)))
+                           result)))]
+          result)
+     :g (let [result (loop [s (:asks order-book)
+                            result (vec (repeat INPUT-SIZE 0))]
+                       (let [[price-str qty-str] (first s)
+                             price (parse-double price-str)
+                             qty (parse-double qty-str)]
+                         (if (< price max-level)
+                           (let [level (get-price-level price price-interval)]
+                             (recur (rest s) (if (>= price min-level)
+                                               (update result (get-price-level-index level min-level price-interval) #(+ (or % 0) qty))
+                                               result)))
+                           result)))]
+          result)}))
+
+(def keep-running? (atom true))
+(def noise-counter (atom 0))
 
 (defn pipeline-v1 []
   (let [input (atom clojure.lang.PersistentQueue/EMPTY)
@@ -92,11 +97,17 @@
            (let [image (du/->image {:data (take INPUT-SIZE @input)
                                     :max-value MAX-QUANTITY})
                  label (calc-label @label-queue)]
-             (when label
+             (when (or (not= label "wait")
+                       ;; we want to undersample the wait category in 40 times
+                       (= 0 (mod (swap! noise-counter inc) 40)))
                (du/save-image {:image image
                                :dir "./dataset"
                                :filename label
-                               :local? (System/getenv "LOCAL")})))))))))
+                               :local? (System/getenv "LOCAL")}))))))
+     keep-running?)))
 
 (defn prepare! []
   (pipeline-v1))
+
+;(prepare!)
+;(reset! keep-running? false)

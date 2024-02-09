@@ -1,11 +1,11 @@
-(ns hft.scheduler 
-  (:require [clojure.core.async :refer [thread]]))
+(ns hft.scheduler)
 
-(defn start! [interval f]
+(defn start! [interval f keep-running?]
   (loop [scheduled-t (System/currentTimeMillis)]
-    (let [current-t (System/currentTimeMillis)]
-      (if (>= current-t scheduled-t)
-        (do (f)
-            (recur (+ scheduled-t interval)))
-        (do (Thread/sleep (- scheduled-t current-t))
-            (recur scheduled-t))))))
+    (when @keep-running?
+      (let [current-t (System/currentTimeMillis)]
+        (if (>= current-t scheduled-t)
+          (do (f)
+              (recur (+ scheduled-t interval)))
+          (do (Thread/sleep (- scheduled-t current-t))
+              (recur scheduled-t)))))))
