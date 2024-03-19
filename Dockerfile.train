@@ -5,10 +5,9 @@ COPY --from=ghcr.io/graalvm/graalvm-community:21 $JAVA_HOME $JAVA_HOME
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 COPY target/uberjar/app.jar ./
-COPY binance.config.edn ./
 COPY gcp.json ./
-COPY image-counter.txt ./
-COPY dataset ./dataset
+COPY dataset/test ./dataset/test
+COPY dataset/train ./dataset/train
 ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
 CMD ["java", "-jar", "app.jar", "-n"]
 

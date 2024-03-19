@@ -16,7 +16,8 @@
                  [ai.djl/api "0.25.0"]
                  [ai.djl.pytorch/pytorch-engine "0.25.0" :scope "runtime"]
                  [ai.djl/basicdataset "0.25.0"]
-                 [ai.djl/model-zoo "0.25.0"]]
+                 [ai.djl/model-zoo "0.25.0"]
+                 [org.apache.commons/commons-lang3 "3.14.0"]]
   :main hft.core
   :target-path "target/%s"
   :uberjar-name "app.jar"

@@ -1,5 +1,6 @@
 (ns hft.train
   (:require [clojure.java.io :as io]
+            [hft.dataset :as dataset]
             [hft.gcloud :refer [upload-model!]])
   (:import (ai.djl Model)
            (ai.djl.basicdataset.cv.classification ImageFolder)
@@ -9,21 +10,22 @@
            (ai.djl.ndarray NDManager)
            (ai.djl.ndarray.types Shape)
            (ai.djl.repository Repository)
-           (ai.djl.training DefaultTrainingConfig EasyTrain)
+           (ai.djl.training DefaultTrainingConfig EasyTrain Trainer)
            (ai.djl.training.evaluator Accuracy)
-           (ai.djl.training.listener TrainingListener$Defaults)
+           (ai.djl.training.listener EvaluatorTrainingListener TrainingListener TrainingListener$BatchData TrainingListener$Defaults)
            (ai.djl.training.loss Loss)
            (ai.djl.training.optimizer Optimizer)
            (ai.djl.training.tracker Tracker)
            [java.nio.file Paths]
-           (java.util Arrays)))
+           (java.util Arrays)
+           (org.apache.commons.lang3 ArrayUtils)))
 
-(def lr 0.005)
-(def epochs 20)
+(def lr 0.02)
+(def epochs 40)
 (def batch-size 100)
-(def IMAGE-SIZE 60)
+(def IMAGE-SIZE dataset/INPUT-SIZE)
 (def IMAGE-NUM-CHAN 3)
-(def NUM-CATEGORIES 2)
+(def NUM-CATEGORIES 3)
 (def MODEL-NAME "cnn")
 (def MODEL-FOLDER "./model")
 (def MODEL-OPTIONS {:img-opts {:width IMAGE-SIZE
@@ -56,6 +58,29 @@
   (doto (get-model MODEL-OPTIONS)
     (.load (Paths/get (.toURI (io/file MODEL-FOLDER))))))
 
+(def callback
+  (let [epochs (atom 0)]
+    (reify TrainingListener
+      (^void onEpoch [_this ^Trainer trainer]
+        (swap! epochs inc)
+        (let [metrics (.getMetrics trainer)
+              evaluators (.getEvaluators trainer)
+              epoch EvaluatorTrainingListener/VALIDATE_EPOCH]
+          (doall
+           (for [evaluator evaluators
+                 :let [metric-name (EvaluatorTrainingListener/metricName evaluator epoch)]
+                 :when (.hasMetric metrics metric-name)
+                 :let [value (.floatValue (.getValue (.latestMetric metrics metric-name)))]
+                 :when (and (= metric-name "validate_epoch_Accuracy")
+                            (>= value 0.73))
+                 :let [model (.getModel trainer)]]
+             (.setProperty model "Epoch" (str epochs))
+             (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME)))))
+      (^void onTrainingBegin [_this ^Trainer trainer])
+      (^void onTrainingEnd [_this ^Trainer trainer])
+      (^void onTrainingBatch [_this ^Trainer trainer ^TrainingListener$BatchData batchData])
+      (^void onValidationBatch [_this ^Trainer trainer ^TrainingListener$BatchData batchData]))))
+
 (defn start! []
   (let [_memory-manager (NDManager/newBaseManager)
         model (get-model MODEL-OPTIONS)
@@ -68,7 +93,8 @@
         config (-> (DefaultTrainingConfig. loss)
                    (.optOptimizer sgd)
                    (.addEvaluator (Accuracy.))
-                   (.addTrainingListeners (TrainingListener$Defaults/logging)))
+                   (.addTrainingListeners
+                     (ArrayUtils/add (TrainingListener$Defaults/logging) ^TrainingListener callback)))
         inputShape (Shape. (Arrays/asList (into-array [1 IMAGE-NUM-CHAN IMAGE-SIZE IMAGE-SIZE])))
         trainer (doto (.newTrainer model config)
                   (.setMetrics (Metrics.))

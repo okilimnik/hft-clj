@@ -1,16 +1,12 @@
 (ns transform-dataset 
-  (:require [clojure.java.io :as io]))
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]))
 
-(def categories #{"10000000"
-                  "01000000"
-                  "00100000"
-                  "00010000"
-                  "00001000"
-                  "00000100"
-                  "00000010"
-                  "00000001"})
+(def categories #{"buy"
+                  "sell"
+                  "wait"})
 
-(def folder (io/file "./dataset/order_book10"))
+(def folder (io/file "./dataset/order_book20"))
 (def files (file-seq folder))
 
 (defn move-file [source-file dest-path]
@@ -19,7 +15,7 @@
 
 (doseq [file files]
   (let [filename (.getName file)
-        category (subs filename 0 8)
+        category (first (str/split filename #"_"))
         dest-folder (io/file (str "./dataset/" category))]
     (when (contains? categories category)
       (when-not (.exists dest-folder)
