@@ -80,9 +80,10 @@
                 (recur)))))))))
 
 (defn trade? [[buy sell wait]]
-  (and (> (.getProbability buy) 4)
-       (< (.getProbability sell) -3)
-       (< (.getProbability wait) -3)))
+  (and (> (.getProbability buy) 2)
+       (< (.getProbability sell) -1)
+       (< (.getProbability wait) -1)
+       (> (.getProbability wait) (.getProbability sell))))
 
 (defn trade! [prediction asks]
   (when (trade? prediction)

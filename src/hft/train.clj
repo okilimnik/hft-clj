@@ -20,7 +20,7 @@
            (java.util Arrays)
            (org.apache.commons.lang3 ArrayUtils)))
 
-(def lr 0.02)
+(def lr 0.05)
 (def epochs 40)
 (def batch-size 100)
 (def IMAGE-SIZE dataset/INPUT-SIZE)
@@ -59,23 +59,22 @@
     (.load (Paths/get (.toURI (io/file MODEL-FOLDER))))))
 
 (def callback
-  (let [epochs (atom 0)]
+  (let [epoch (atom 0)]
     (reify TrainingListener
       (^void onEpoch [_this ^Trainer trainer]
-        (swap! epochs inc)
+        (swap! epoch inc)
         (let [metrics (.getMetrics trainer)
-              evaluators (.getEvaluators trainer)
-              epoch EvaluatorTrainingListener/VALIDATE_EPOCH]
+              evaluators (.getEvaluators trainer)]
           (doall
            (for [evaluator evaluators
-                 :let [metric-name (EvaluatorTrainingListener/metricName evaluator epoch)]
+                 :let [metric-name (EvaluatorTrainingListener/metricName evaluator EvaluatorTrainingListener/VALIDATE_EPOCH)]
                  :when (.hasMetric metrics metric-name)
                  :let [value (.floatValue (.getValue (.latestMetric metrics metric-name)))]
                  :when (and (= metric-name "validate_epoch_Accuracy")
-                            (>= value 0.73))
+                            (>= value 0.72))
                  :let [model (.getModel trainer)]]
-             (.setProperty model "Epoch" (str epochs))
-             (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME)))))
+             (do (.setProperty model "Epoch" (str @epoch))
+                 (.save model (Paths/get (.toURI (io/file MODEL-FOLDER))) MODEL-NAME))))))
       (^void onTrainingBegin [_this ^Trainer trainer])
       (^void onTrainingEnd [_this ^Trainer trainer])
       (^void onTrainingBatch [_this ^Trainer trainer ^TrainingListener$BatchData batchData])
