@@ -17,6 +17,11 @@
 (defn open-order! [params]
   (jread (.newOrder @trade-client (java.util.HashMap. params))))
 
+(defn get-order! [symbol order-id]
+  (jread (.getOrder @trade-client (java.util.HashMap. {"symbol" symbol
+                                                       "orderId" order-id
+                                                       "timestamp" (System/currentTimeMillis)}))))
+
 (defn opened-orders! [symbol]
   (jread (.getOpenOrders @trade-client (java.util.HashMap. {"symbol" symbol
                                                             "timestamp" (System/currentTimeMillis)}))))

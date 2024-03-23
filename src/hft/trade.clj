@@ -17,7 +17,7 @@
 
 (def SYMBOL dataset/SYMBOL)
 (def predictor (atom nil))
-(def TRADE-AMOUNT-BTC 0.005)
+(def TRADE-AMOUNT-BTC 0.0005)
 (def PROFIT-USD 40)
 (def LOSS-USD 40)
 
@@ -56,28 +56,21 @@
       (reset! trading? true)
       (let [buy-price (dataset/find-trade-price asks)]
         (log/debug "trying to buy at " buy-price)
-        (bi/open-order! (create-buy-params {:price buy-price}))
-        (go-loop []
-          (<! (timeout 3000))
-          (let [opened-orders (bi/opened-orders! SYMBOL)]
-            (cond
-              (empty? opened-orders)
-              (do
-                (log/debug "we successfully bought, creating stop loss/profit orders")
-                (bi/open-order! (create-take-profit-params {:price buy-price}))
-                (bi/open-order! (create-stop-loss-params {:price buy-price}))
-                (recur))
-
-              (= (count opened-orders) 1)
-              (do
-                (log/debug "there is an open order, canceling it")
-                (bi/cancel-order! SYMBOL (get-in opened-orders [0 "orderId"]))
-                (reset! trading? false))
-
-              :else
-              (do
-                (log/debug "we're waiting for stop profit or stop loss to be triggered")
-                (recur)))))))))
+        (let [buy-order-id (bi/open-order! (create-buy-params {:price buy-price}))]
+          (go-loop [take-profit-order-id nil]
+            (<! (timeout 3000))
+            (if take-profit-order-id
+              (let [{:keys [status]} (bi/get-order! SYMBOL take-profit-order-id)]
+                (if (= status "FILLED")
+                  (log/debug "we successfully took profit, can trade further")
+                  (recur take-profit-order-id)))
+              (let [{:keys [status]} (bi/get-order! SYMBOL buy-order-id)]
+                (if (= status "FILLED")
+                  (do
+                    (log/debug "we successfully bought, creating stop profit orders")
+                    (let [{:keys [orderId]} (bi/open-order! (create-take-profit-params {:price buy-price}))]
+                      (recur orderId)))
+                  (recur nil))))))))))
 
 (defn trade? [[buy sell wait]]
   (and (> (.getProbability buy) 2)
