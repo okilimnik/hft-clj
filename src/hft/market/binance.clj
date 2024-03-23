@@ -15,25 +15,20 @@
   (j/read-value v j/keyword-keys-object-mapper))
 
 (defn open-order! [params]
-  (when-not @market-client (init))
-  (jread (.newOrder @trade-client params)))
+  (jread (.newOrder @trade-client (java.util.HashMap. params))))
 
 (defn opened-orders! [symbol]
-  (when-not @market-client (init))
-  (jread (.getOpenOrders @trade-client {"symbol" symbol
-                                        "timestamp" (System/currentTimeMillis)})))
+  (jread (.getOpenOrders @trade-client (java.util.HashMap. {"symbol" symbol
+                                                            "timestamp" (System/currentTimeMillis)}))))
 
 (defn cancel-order! [symbol id]
-  (when-not @market-client (init))
-  (-> (.cancelOrder @trade-client {"symbol" symbol
-                                   "orderId" id
-                                   "timestamp" (System/currentTimeMillis)})
+  (-> (.cancelOrder @trade-client (java.util.HashMap. {"symbol" symbol
+                                                       "orderId" id
+                                                       "timestamp" (System/currentTimeMillis)}))
       jread))
 
 (defn depth! [symbol limit]
-  (when-not @market-client (init))
-  (jread (.depth @market-client {"symbol" symbol "limit" limit})))
+  (jread (.depth @market-client (java.util.HashMap. {"symbol" symbol "limit" limit}))))
 
 (defn best-price! [symbol]
-  (when-not @market-client (init))
-  (jread (.bookTicker @market-client {"symbol" symbol})))
+  (jread (.bookTicker @market-client (java.util.HashMap. {"symbol" symbol}))))

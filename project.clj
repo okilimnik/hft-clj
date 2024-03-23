@@ -10,7 +10,7 @@
                  [metosin/jsonista "0.3.8"]
                  [com.taoensso/timbre "6.3.1"]
                  [com.fzakaria/slf4j-timbre "0.4.0"]
-                 [io.github.binance/binance-connector-java "3.0.0rc3"]
+                 [io.github.binance/binance-connector-java "3.2.0"]
                  [com.google.cloud/google-cloud-storage "2.25.0"]
                  [net.mikera/imagez "0.12.0"]
                  [ai.djl/api "0.25.0"]

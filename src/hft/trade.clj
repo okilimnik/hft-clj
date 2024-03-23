@@ -124,5 +124,6 @@
      keep-running?)))
 
 (defn start! []
+  (bi/init)
   (load-model)
   (start-consumer!))
