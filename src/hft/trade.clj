@@ -56,20 +56,19 @@
       (reset! trading? true)
       (let [buy-price (dataset/find-trade-price asks)]
         (log/debug "trying to buy at " buy-price)
-        (let [buy-order-id (bi/open-order! (create-buy-params {:price buy-price}))]
+        (let [buy-order-id (:orderId (bi/open-order! (create-buy-params {:price buy-price})))]
           (go-loop [take-profit-order-id nil]
             (<! (timeout 3000))
             (if take-profit-order-id
-              (let [{:keys [status]} (bi/get-order! SYMBOL take-profit-order-id)]
-                (if (= status "FILLED")
-                  (log/debug "we successfully took profit, can trade further")
-                  (recur take-profit-order-id)))
+              (if (= (:status (bi/get-order! SYMBOL take-profit-order-id)) "FILLED")
+                (do (log/debug "we successfully took profit, can trade further")
+                    (reset! trading? true))
+                (recur take-profit-order-id))
               (let [{:keys [status]} (bi/get-order! SYMBOL buy-order-id)]
                 (if (= status "FILLED")
                   (do
                     (log/debug "we successfully bought, creating stop profit orders")
-                    (let [{:keys [orderId]} (bi/open-order! (create-take-profit-params {:price buy-price}))]
-                      (recur orderId)))
+                    (recur (:orderId (bi/open-order! (create-take-profit-params {:price buy-price})))))
                   (recur nil))))))))))
 
 (defn trade? [[buy sell wait]]
