@@ -7,7 +7,7 @@
 (def INPUT-SIZE 20)
 (def LABEL-QUEUE-SIZE 6)
 (def MAX-QUANTITY 50)
-(def PRICE-INTERVAL-FOR-INDEXING 5)
+(def PRICE-INTERVAL-FOR-INDEXING 10)
 (def TRADING-QTY 0.05)
 (def OPEN-ORDER-LAG 0.5)
 (def PROFIT 40)
@@ -98,8 +98,8 @@
                                     :max-value MAX-QUANTITY})
                  label (calc-label @label-queue)]
              (when (or (not= label "wait")
-                       ;; we want to undersample the wait category in 40 times
-                       (= 0 (mod (swap! noise-counter inc) 40)))
+                       ;; we want to undersample the wait category in 80 times
+                       (= 0 (mod (swap! noise-counter inc) 80)))
                (du/save-image {:image image
                                :dir "./dataset"
                                :filename label

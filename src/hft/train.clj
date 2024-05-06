@@ -21,7 +21,7 @@
            (org.apache.commons.lang3 ArrayUtils)))
 
 (def lr 0.05)
-(def epochs 40)
+(def epochs 100)
 (def batch-size 100)
 (def IMAGE-SIZE dataset/INPUT-SIZE)
 (def IMAGE-NUM-CHAN 3)
@@ -37,7 +37,7 @@
   (.build
    (doto (ResNetV1/builder)
      (.setImageShape (Shape. (Arrays/asList (into-array [(:num-chan img-opts) (:width img-opts) (:height img-opts)]))))
-     (.setNumLayers 50)
+     (.setNumLayers 50) ;;101
      (.setOutSize num-categories))))
 
 (defn get-model [options]
@@ -82,8 +82,8 @@
 
 (defn start! []
   (let [_memory-manager (NDManager/newBaseManager)
-        model (get-model MODEL-OPTIONS)
-        ;model (load-model)
+        ;model (get-model MODEL-OPTIONS)
+        model (load-model)
         loss (Loss/softmaxCrossEntropyLoss)
         lrt (Tracker/fixed lr)
         sgd (-> (Optimizer/sgd)

@@ -12,6 +12,7 @@
            [ai.djl.modality.cv.transform ToTensor]
            [ai.djl.modality.cv.translator ImageClassificationTranslator]
            [ai.djl.ndarray NDManager]
+           [com.binance.connector.client.exceptions BinanceClientException]
            [java.nio.file Paths]
            [java.util Arrays]))
 
@@ -24,21 +25,20 @@
 (def keep-running? (atom true))
 (def trading? (atom false))
 
-(defn create-buy-params [{:keys [price]}]
+(defn create-buy-params []
   {"symbol" SYMBOL
    "side" "BUY"
-   "type" "LIMIT"
-   "timeInForce" "GTC"
-   "quantity" TRADE-AMOUNT-BTC
-   "price" price})
+   "type" "MARKET"
+   "quantity" TRADE-AMOUNT-BTC})
 
-(defn create-take-profit-params [{:keys [price]}]
-  {"symbol" SYMBOL
-   "side" "SELL"
-   "type" "LIMIT"
-   "timeInForce" "GTC"
-   "quantity" TRADE-AMOUNT-BTC
-   "price" (+ price PROFIT-USD)})
+(defn create-take-profit-params [{:keys [price f] :or {f identity}}]
+  (f
+   {"symbol" SYMBOL
+    "side" "SELL"
+    "type" "LIMIT"
+    "timeInForce" "GTC"
+    "quantity" TRADE-AMOUNT-BTC
+    "price" (+ price PROFIT-USD)}))
 
 (defn create-stop-loss-params [{:keys [price]}]
   {"symbol" SYMBOL
@@ -48,28 +48,31 @@
    "quantity" TRADE-AMOUNT-BTC
    "price" (- price LOSS-USD)})
 
-(defn open-order! [asks]
+(defn open-order! []
   (log/debug "open-order! triggered")
   (let [opened-orders (bi/opened-orders! SYMBOL)]
     (when (empty? opened-orders)
       (log/debug "no open orders so we can trade")
       (reset! trading? true)
-      (let [buy-price (dataset/find-trade-price asks)]
-        (log/debug "trying to buy at " buy-price)
-        (let [buy-order-id (:orderId (bi/open-order! (create-buy-params {:price buy-price})))]
-          (go-loop [take-profit-order-id nil]
-            (<! (timeout 3000))
-            (if take-profit-order-id
-              (if (= (:status (bi/get-order! SYMBOL take-profit-order-id)) "FILLED")
-                (do (log/debug "we successfully took profit, can trade further")
-                    (reset! trading? true))
-                (recur take-profit-order-id))
-              (let [{:keys [status]} (bi/get-order! SYMBOL buy-order-id)]
-                (if (= status "FILLED")
-                  (do
-                    (log/debug "we successfully bought, creating stop profit orders")
-                    (recur (:orderId (bi/open-order! (create-take-profit-params {:price buy-price})))))
-                  (recur nil))))))))))
+      (let [buy-order-id (:orderId (bi/open-order! (create-buy-params)))]
+        (go-loop [take-profit-order-id nil]
+          (<! (timeout 3000))
+          (if take-profit-order-id
+            (if (= (:status (bi/get-order! SYMBOL take-profit-order-id)) "FILLED")
+              (do (log/debug "we successfully took profit, can trade further")
+                  (reset! trading? false))
+              (recur take-profit-order-id))
+            (let [{:keys [status price]} (bi/get-order! SYMBOL buy-order-id)
+                  buy-price (parse-long price)]
+              (if (= status "FILLED")
+                (do
+                  (log/debug "we successfully bought, creating stop profit orders")
+                  (recur (:orderId (try (bi/open-order! (create-take-profit-params {:price buy-price}))
+                                        (catch BinanceClientException e (case (get (ex-data e) "code")
+                                                                          "-2010" (bi/open-order! (create-take-profit-params {:price buy-price
+                                                                                                                              :f #(update % "quantity" - 0.00001)}))
+                                                                          nil))))))
+                (recur nil)))))))))
 
 (defn trade? [[buy sell wait]]
   (and (> (.getProbability buy) 2)
@@ -77,9 +80,9 @@
        (< (.getProbability wait) -1)
        (> (.getProbability wait) (.getProbability sell))))
 
-(defn trade! [prediction asks]
+(defn trade! [prediction]
   (when (trade? prediction)
-    (open-order! asks)))
+    (open-order!)))
 
 (defn load-model []
   (let [_memory-manager (NDManager/newBaseManager)
@@ -112,7 +115,7 @@
                                     :max-value dataset/MAX-QUANTITY})]
              (i/save image input-filepath)
              (let [prediction (get-prediction! input-filepath)]
-               (trade! prediction (:asks order-book)))))))
+               (trade! prediction))))))
      keep-running?)))
 
 (defn start! []
