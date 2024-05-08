@@ -21,3 +21,4 @@ gcp.json
 /trade
 /.vscode
 image-counter.txt
+resources/*.png

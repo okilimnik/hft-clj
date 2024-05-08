@@ -1,0 +1,8 @@
+{:deps
+ {org.clojure/clojure                      {:mvn/version "1.11.1"}
+  org.clojure/core.async                   {:mvn/version "1.6.681"}
+  io.github.humbleui/humbleui              {:git/sha "321a27826b6dca2e35bde3b6ec0fc261f2e71121"}
+  nrepl/nrepl                              {:mvn/version "1.0.0"}
+  net.mikera/imagez                        {:mvn/version "0.12.0"}
+  io.github.binance/binance-connector-java {:mvn/version "3.2.0"}
+  metosin/jsonista                         {:mvn/version "0.3.8"}}}

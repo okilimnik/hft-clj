@@ -50,15 +50,17 @@
         max-level (+ level-10 (* price-interval (dec (/ INPUT-SIZE 2))) price-interval)]
     {:r (let [result (loop [s (:bids order-book)
                             result (vec (repeat INPUT-SIZE 0))]
-                       (let [[price-str qty-str] (first s)
-                             price (parse-double price-str)
-                             qty (parse-double qty-str)]
-                         (if (>= price min-level)
-                           (let [level (get-price-level price price-interval)]
-                             (recur (rest s) (if (< price max-level)
-                                               (update result (get-price-level-index level min-level price-interval) #(+ (or % 0) qty))
-                                               result)))
-                           result)))]
+                       (if (seq s)
+                         (let [[price-str qty-str] (first s)
+                               price (parse-double price-str)
+                               qty (parse-double qty-str)]
+                           (if (>= price min-level)
+                             (let [level (get-price-level price price-interval)]
+                               (recur (rest s) (if (< price max-level)
+                                                 (update result (get-price-level-index level min-level price-interval) #(+ (or % 0) qty))
+                                                 result)))
+                             result))
+                         result))]
           result)
      :g (let [result (loop [s (:asks order-book)
                             result (vec (repeat INPUT-SIZE 0))]
@@ -76,7 +78,7 @@
 (def keep-running? (atom true))
 (def noise-counter (atom 0))
 
-(defn pipeline-v1 []
+(defn pipeline-v1 [{:keys [on-update] :or {on-update #()}}]
   (let [input (atom clojure.lang.PersistentQueue/EMPTY)
         label-queue (atom clojure.lang.PersistentQueue/EMPTY)]
     (scheduler/start!
@@ -96,14 +98,12 @@
          (when (= (count @input) (dec (+ INPUT-SIZE LABEL-QUEUE-SIZE)))
            (let [image (du/->image {:data (take INPUT-SIZE @input)
                                     :max-value MAX-QUANTITY})
-                 label (calc-label @label-queue)]
-             (when (or (not= label "wait")
-                       ;; we want to undersample the wait category in 80 times
-                       (= 0 (mod (swap! noise-counter inc) 80)))
-               (du/save-image {:image image
-                               :dir "./dataset"
-                               :filename label
-                               :local? (System/getenv "LOCAL")}))))))
+                 label (calc-label @label-queue)
+                 filepath (du/save-image {:image image
+                                          :dir "./resources"
+                                          :filename label
+                                          :local? (System/getenv "LOCAL")})]
+             (on-update filepath)))))
      keep-running?)))
 
 (defn prepare! []
