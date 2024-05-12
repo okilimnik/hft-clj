@@ -20,6 +20,6 @@
   ;; user/-main or the app -main
   (some-> *window deref window/request-frame))
 
-(defn update-input-image [new-src]
-  (swap! *app assoc :input-image-src new-src)
+(defn update-input-image [{:keys [src label]}]
+  (swap! *app assoc :input-image-src src :input-image-label label)
   (redraw!))

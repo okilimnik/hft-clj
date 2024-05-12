@@ -7,12 +7,15 @@
             [hft.market.binance :as bi]))
 
 (def root
-  (ui/default-theme {}
-                    (ui/dynamic _ctx [src (:input-image-src @state/*app)]
-                                (ui/center
-                                 (if (.exists (io/file src))
-                                   (ui/image src)
-                                   (ui/label "Warming..."))))))
+  (ui/default-theme
+   {}
+   (ui/dynamic _ctx [src (:input-image-src @state/*app)
+                     label (:input-image-label @state/*app)]
+               (ui/column
+                (ui/center
+                 (if (.exists (io/file src))
+                   (ui/image src)
+                   (ui/label "Warming...")))))))
 
 (defn -main [& args]
   (bi/init)

@@ -1,13 +1,14 @@
 (ns hft.dataset
-  (:require [hft.market.binance :as bi]
-            [hft.data :as du]
-            [hft.scheduler :as scheduler]))
+  (:require [hft.data :as du]
+            [hft.market.binance :as bi]
+            [hft.scheduler :as scheduler]) 
+  (:import [java.awt.image BufferedImage]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
 (def LABEL-QUEUE-SIZE 6)
-(def MAX-QUANTITY 50)
-(def PRICE-INTERVAL-FOR-INDEXING 10)
+(def MAX-QUANTITY 20)
+(def PRICE-INTERVAL-FOR-INDEXING 15)
 (def TRADING-QTY 0.05)
 (def OPEN-ORDER-LAG 0.5)
 (def PROFIT 40)
@@ -48,7 +49,7 @@
         level-10 (get-price-level max-bid price-interval)
         min-level (- level-10 (* price-interval (dec (/ INPUT-SIZE 2))))
         max-level (+ level-10 (* price-interval (dec (/ INPUT-SIZE 2))) price-interval)]
-    {:r (let [result (loop [s (:bids order-book)
+    {:b (let [result (loop [s (:bids order-book)
                             result (vec (repeat INPUT-SIZE 0))]
                        (if (seq s)
                          (let [[price-str qty-str] (first s)
@@ -64,15 +65,17 @@
           result)
      :g (let [result (loop [s (:asks order-book)
                             result (vec (repeat INPUT-SIZE 0))]
-                       (let [[price-str qty-str] (first s)
-                             price (parse-double price-str)
-                             qty (parse-double qty-str)]
-                         (if (< price max-level)
-                           (let [level (get-price-level price price-interval)]
-                             (recur (rest s) (if (>= price min-level)
-                                               (update result (get-price-level-index level min-level price-interval) #(+ (or % 0) qty))
-                                               result)))
-                           result)))]
+                       (if (seq s)
+                         (let [[price-str qty-str] (first s)
+                               price (parse-double price-str)
+                               qty (parse-double qty-str)]
+                           (if (< price max-level)
+                             (let [level (get-price-level price price-interval)]
+                               (recur (rest s) (if (>= price min-level)
+                                                 (update result (get-price-level-index level min-level price-interval) #(+ (or % 0) qty))
+                                                 result)))
+                             result))
+                         result))]
           result)}))
 
 (def keep-running? (atom true))
@@ -84,7 +87,7 @@
     (scheduler/start!
      3000
      (fn []
-       (let [order-book (bi/depth! SYMBOL 1000)]
+       (let [order-book (bi/depth! SYMBOL 5000)]
          (swap! input #(as-> % $
                          (conj $ (order-book->quantities-indexed-by-price-level PRICE-INTERVAL-FOR-INDEXING order-book))
                          (if (> (count $) (dec (+ INPUT-SIZE LABEL-QUEUE-SIZE)))
@@ -98,16 +101,22 @@
          (when (= (count @input) (dec (+ INPUT-SIZE LABEL-QUEUE-SIZE)))
            (let [image (du/->image {:data (take INPUT-SIZE @input)
                                     :max-value MAX-QUANTITY})
+                 resizedImage (BufferedImage. 300 300 BufferedImage/TYPE_INT_RGB)
+                 g (.createGraphics resizedImage)
+                 _ (.drawImage g image 0 0 300 300 nil)
                  label (calc-label @label-queue)
-                 filepath (du/save-image {:image image
+                 _ (.setFont g (.deriveFont (.getFont g) (float 30)))
+                 _ (.drawString g label 30 30)
+                 _ (.dispose g)
+                 filepath (du/save-image {:image resizedImage
                                           :dir "./resources"
                                           :filename label
                                           :local? (System/getenv "LOCAL")})]
-             (on-update filepath)))))
+             (on-update {:src filepath :label label})))))
      keep-running?)))
 
 (defn prepare! []
-  (pipeline-v1))
+  (pipeline-v1 {}))
 
 ;(prepare!)
 ;(reset! keep-running? false)
