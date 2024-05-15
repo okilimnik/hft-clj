@@ -1,16 +1,20 @@
 (ns hft.data
   (:require [clojure.java.io :as io]
             [mikera.image.core :as i]
-            #_[hft.gcloud :refer [upload-file!]])
+            #_[hft.gcloud :refer [upload-file!]]
+            [clojure.string :as str])
   (:import [java.awt Color]))
 
 (def image-counter (atom nil))
 (def IMAGE-COUNTER-FILE "./image-counter.txt")
 
 (defn- get-image-number! []
-  (let [new-val (swap! image-counter inc)]
+  (let [new-val (swap! image-counter inc)
+        max-l 10]
     (spit IMAGE-COUNTER-FILE (str new-val))
-    new-val))
+    (let [s (str (str/join (repeat max-l "0")) new-val)
+          l (count s)]
+      (subs s (- l max-l) l))))
 
 (defn- init-image-counter []
   (when-not @image-counter
@@ -53,7 +57,8 @@
   (let [dir (io/file dir)]
     (when-not (.exists dir)
       (.mkdirs dir))
-    (let [indexed-filename (str filename "_" (get-image-number!) ".png")
+    (let [;indexed-filename (str filename "_" (get-image-number!) ".png")
+          indexed-filename (str (get-image-number!) ".png")
           filepath (str dir "/" indexed-filename)]
       (i/save image filepath)
       filepath

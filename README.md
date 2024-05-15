@@ -10,3 +10,7 @@
     $ gsutil -m cp -R gs://neusa-datasets/order_book20 dataset/
 
 Best: 75 train 74 valid
+
+
+ffmpeg -framerate 30 -pattern_type glob -i '*.png' \
+  -c:v libx264 -pix_fmt yuv420p out.mp4
