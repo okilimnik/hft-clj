@@ -1,17 +1,17 @@
 (ns hft.dataset
   (:require [hft.data :as du]
             [hft.market.binance :as bi]
-            [hft.scheduler :as scheduler]) 
-  (:import [java.awt.image BufferedImage]))
+            [hft.scheduler :as scheduler]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
 (def LABEL-QUEUE-SIZE 6)
-(def MAX-QUANTITY 20)
-(def PRICE-INTERVAL-FOR-INDEXING 15)
+(def MAX-QUANTITY 50)
+(def PROFIT 40)
+(def PRICE-INTERVAL-FOR-INDEXING 25)
 (def TRADING-QTY 0.05)
 (def OPEN-ORDER-LAG 0.5)
-(def PROFIT 40)
+
 
 (defn find-first [pred getter s]
   (loop [s' s]
@@ -81,7 +81,7 @@
 (def keep-running? (atom true))
 (def noise-counter (atom 0))
 
-(defn pipeline-v1 [{:keys [on-update] :or {on-update #()}}]
+(defn pipeline-v1 [{:keys [on-update ui?] :or {on-update (fn [_])}}]
   (let [input (atom clojure.lang.PersistentQueue/EMPTY)
         label-queue (atom clojure.lang.PersistentQueue/EMPTY)]
     (scheduler/start!
@@ -101,21 +101,23 @@
          (when (= (count @input) (dec (+ INPUT-SIZE LABEL-QUEUE-SIZE)))
            (let [image (du/->image {:data (take INPUT-SIZE @input)
                                     :max-value MAX-QUANTITY})
-                 resizedImage (BufferedImage. 300 300 BufferedImage/TYPE_INT_RGB)
-                 g (.createGraphics resizedImage)
-                 _ (.drawImage g image 0 0 300 300 nil)
                  label (calc-label @label-queue)
-                 _ (.setFont g (.deriveFont (.getFont g) (float 30)))
-                 _ (.drawString g label 30 30)
-                 _ (.dispose g)
-                 filepath (du/save-image {:image resizedImage
-                                          :dir "./resources"
-                                          :filename label
-                                          :local? (System/getenv "LOCAL")})]
+                 filepath   (if (and (= label "wait") (not ui?))
+                              (let [counter (swap! noise-counter inc)]
+                                (when (= counter 20)
+                                  (reset! noise-counter 0)
+                                  (du/save-image {:image image
+                                                  :dir "./dataset"
+                                                  :filename label})))
+                              (du/save-image {:image image
+                                              :dir "./dataset"
+                                              :filename label
+                                              :ui? ui?}))]
              (on-update {:src filepath :label label})))))
      keep-running?)))
 
 (defn prepare! []
+  (bi/init)
   (pipeline-v1 {}))
 
 ;(prepare!)

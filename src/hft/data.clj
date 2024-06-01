@@ -1,7 +1,7 @@
 (ns hft.data
   (:require [clojure.java.io :as io]
             [mikera.image.core :as i]
-            #_[hft.gcloud :refer [upload-file!]]
+            [hft.gcloud :refer [upload-file!]]
             [clojure.string :as str])
   (:import [java.awt Color]))
 
@@ -52,16 +52,15 @@
     (i/set-pixels image pixels)
     image))
 
-(defn save-image [{:keys [image dir filename local?] :or {local? false}}]
+(defn save-image [{:keys [image dir filename ui?] :or {ui? false}}]
   (init-image-counter)
   (let [dir (io/file dir)]
     (when-not (.exists dir)
       (.mkdirs dir))
-    (let [;indexed-filename (str filename "_" (get-image-number!) ".png")
-          indexed-filename (str (get-image-number!) ".png")
+    (let [indexed-filename (str (get-image-number!) "_" filename ".png")
           filepath (str dir "/" indexed-filename)]
       (i/save image filepath)
-      filepath
-      #_(when-not local?
+      (when-not ui?
         (upload-file! indexed-filename filepath)
-        (io/delete-file filepath)))))
+        (io/delete-file filepath))
+      filepath)))

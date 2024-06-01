@@ -1,15 +1,19 @@
-(ns ^{:clojure.tools.namespace.repl/load false} hft.ui.state
+(ns ^{:clojure.tools.namespace.repl/load false :skip-aot true} hft.ui.state
   (:require [io.github.humbleui.window :as window]))
 
+
 (def initial-app-state
-  {:input-image-src "resources/input.png"})
+  {:input-image-src "dataset/input.png"})
+
 
 (def *window
   "State of the main window. Gets set on app startup."
   (atom nil))
 
+
 (defonce *app
   (atom initial-app-state))
+
 
 (defn redraw!
   "Redraws the window with the current app state."
@@ -20,6 +24,8 @@
   ;; user/-main or the app -main
   (some-> *window deref window/request-frame))
 
+
 (defn update-input-image [{:keys [src label]}]
   (swap! *app assoc :input-image-src src :input-image-label label)
   (redraw!))
+         

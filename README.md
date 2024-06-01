@@ -12,5 +12,5 @@
 Best: 75 train 74 valid
 
 
-ffmpeg -framerate 30 -pattern_type glob -i '*.png' \
+ffmpeg -framerate 5 -pattern_type glob -i 'resources/*.png' \
   -c:v libx264 -pix_fmt yuv420p out.mp4
