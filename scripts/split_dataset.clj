@@ -10,8 +10,8 @@
                   file-seq
                   shuffle)
         total (count files)
-        train-quantity 2325
-        test-quantity 775
+        train-quantity (int (* total 0.75))
+        test-quantity (- total train-quantity)
         train (take train-quantity files)
         test (->> files
                   (drop train-quantity)

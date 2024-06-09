@@ -1,4 +1,4 @@
-(ns hft.train
+(ns hft.train.resnet.train
   (:require [clojure.java.io :as io]
             [hft.dataset :as dataset]
             [hft.gcloud :refer [upload-model!]])

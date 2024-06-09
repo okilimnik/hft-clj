@@ -5,7 +5,7 @@
             [hft.dataset :as dataset]
             [hft.market.binance :as bi]
             [hft.scheduler :as scheduler]
-            [hft.train :as train]
+            [hft.train.train :as train]
             [mikera.image.core :as i]
             [taoensso.timbre :as log])
   (:import [ai.djl.modality.cv ImageFactory]

@@ -104,15 +104,17 @@
                  label (calc-label @label-queue)
                  filepath   (if (and (= label "wait") (not ui?))
                               (let [counter (swap! noise-counter inc)]
-                                (when (= counter 20)
+                                (when (= counter 80)
                                   (reset! noise-counter 0)
                                   (du/save-image {:image image
                                                   :dir "./dataset"
                                                   :filename label})))
-                              (du/save-image {:image image
-                                              :dir "./dataset"
-                                              :filename label
-                                              :ui? ui?}))]
+                              (do
+                                (reset! noise-counter 79)
+                                (du/save-image {:image image
+                                                :dir "./dataset"
+                                                :filename label
+                                                :ui? ui?})))]
              (on-update {:src filepath :label label})))))
      keep-running?)))
 

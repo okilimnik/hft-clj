@@ -22,4 +22,4 @@
 
 ;; clj -M -e "(compile 'hft.core)"
 ;; clj -M:uberjar --main-class hft.core
-;; java -jar target/hft.jar -d
+;; GOOGLE_APPLICATION_CREDENTIALS=./gcp.json java -jar target/hft.jar -d

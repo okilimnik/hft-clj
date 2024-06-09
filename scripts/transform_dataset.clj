@@ -6,7 +6,7 @@
                   "sell"
                   "wait"})
 
-(def folder (io/file "./dataset/order_book20"))
+(def folder (io/file "./dataset/order_book30"))
 (def files (file-seq folder))
 
 (defn move-file [source-file dest-path]
@@ -15,7 +15,10 @@
 
 (doseq [file files]
   (let [filename (.getName file)
-        category (first (str/split filename #"_"))
+        category (-> (str/split filename #"_")
+                     second
+                     (str/split #"\.")
+                     first)
         dest-folder (io/file (str "./dataset/" category))]
     (when (contains? categories category)
       (when-not (.exists dest-folder)

@@ -3,11 +3,14 @@
   (:require [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
             [hft.dataset :as dataset]
-            [hft.train :as train]
-            [hft.trade :as trade]))
+            [hft.recurrent :as recurrent]
+            [hft.trade :as trade]
+            [hft.train.resnet.train :as train]))
 
 (def cli-options
-  [["-d" "--dataset" "Prepare dataset"
+  [["-r" "--recurrent" "Recurrent training"
+    :id :recurrent]
+   ["-d" "--dataset" "Prepare dataset"
     :id :dataset]
    ["-n" "--network" "Train network"
     :id :network]
@@ -22,6 +25,7 @@
   (let [{:keys [options _arguments errors _summary]} (parse-opts args cli-options)]
     (cond
       errors (println (error-msg errors))
+      (:recurrent options) (recurrent/start!)
       (:dataset options) (dataset/prepare!)
       (:network options) (train/start!)
       (:trade options) (trade/start!)
