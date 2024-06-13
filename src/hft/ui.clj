@@ -23,7 +23,7 @@
 (defn -main [& args]
   (bi/init)
   (thread
-    (dataset/pipeline-v1 {:on-update state/update-input-image
+    (dataset/pipeline-v2 {:on-update state/update-input-image
                           :ui? true}))
   (ui/start-app!
    (reset! state/*window

@@ -1,38 +1,28 @@
 (ns hft.dataset
-  (:require [hft.data :as du]
+  (:require [environ.core :refer [env]]
+            [hft.data :as du]
             [hft.market.binance :as bi]
-            [hft.scheduler :as scheduler]))
+            [hft.scheduler :as scheduler]
+            [hft.trade :refer [trade!]]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
 (def LABEL-QUEUE-SIZE 6)
 (def MAX-QUANTITY 50)
-(def PROFIT 40)
 (def PRICE-INTERVAL-FOR-INDEXING 25)
-(def TRADING-QTY 0.05)
-(def OPEN-ORDER-LAG 0.5)
+(def THRESHOLD  (or (env :threshold) 200))
 
-
-(defn find-first [pred getter s]
-  (loop [s' s]
-    (let [el (first s')]
-      (if (pred el)
-        (getter el)
-        (recur (rest s'))))))
-
-(defn find-trade-price [prices]
-  (find-first #(>= (parse-double (second %)) (+ TRADING-QTY OPEN-ORDER-LAG)) #(parse-double (first %)) prices))
-
-(defn calc-label [order-books]
-  (let [current (first order-books)
-        nexts (drop 1 order-books)
-        buy-price (find-trade-price (:asks current))
-        sell-price (find-trade-price (:bids current))
-        buy-profit-price (+ buy-price PROFIT)
-        sell-profit-price (- sell-price PROFIT)]
+(defn calc-label [data]
+  (let [sum-b (apply + (map #(apply + %) (map :b data)))
+        sum-g (apply + (map #(apply + %) (map :g data)))
+        diff (abs (- sum-b sum-g))]
     (cond
-      (some #(>= % buy-profit-price) (map (comp find-trade-price :bids) nexts)) "buy"
-      (some #(<= % sell-profit-price) (map (comp find-trade-price :asks) nexts)) "sell"
+      (and
+       (> sum-b sum-g)
+       (> diff THRESHOLD)) "sell"
+      (and
+       (< sum-b sum-g)
+       (> diff THRESHOLD)) "buy"
       :else "wait")))
 
 (defn get-price-level [price interval]
@@ -79,11 +69,9 @@
           result)}))
 
 (def keep-running? (atom true))
-(def noise-counter (atom 0))
 
-(defn pipeline-v1 [{:keys [on-update ui?] :or {on-update (fn [_])}}]
-  (let [input (atom clojure.lang.PersistentQueue/EMPTY)
-        label-queue (atom clojure.lang.PersistentQueue/EMPTY)]
+(defn pipeline-v2 [{:keys [on-update ui?] :or {on-update (fn [_])}}]
+  (let [input (atom clojure.lang.PersistentQueue/EMPTY)]
     (scheduler/start!
      3000
      (fn []
@@ -93,34 +81,19 @@
                          (if (> (count $) (dec (+ INPUT-SIZE LABEL-QUEUE-SIZE)))
                            (pop $)
                            $)))
-         (swap! label-queue #(as-> % $
-                               (conj $ order-book)
-                               (if (> (count $) LABEL-QUEUE-SIZE)
-                                 (pop $)
-                                 $)))
          (when (= (count @input) (dec (+ INPUT-SIZE LABEL-QUEUE-SIZE)))
            (let [image (du/->image {:data (take INPUT-SIZE @input)
                                     :max-value MAX-QUANTITY})
-                 label (calc-label @label-queue)
-                 filepath   (if (and (= label "wait") (not ui?))
-                              (let [counter (swap! noise-counter inc)]
-                                (when (= counter 80)
-                                  (reset! noise-counter 0)
-                                  (du/save-image {:image image
-                                                  :dir "./dataset"
-                                                  :filename label})))
-                              (do
-                                (reset! noise-counter 79)
-                                (du/save-image {:image image
-                                                :dir "./dataset"
-                                                :filename label
-                                                :ui? ui?})))]
-             (on-update {:src filepath :label label})))))
+                 label (calc-label (take INPUT-SIZE @input))]
+             (if ui?
+               (let [filepath (du/save-image {:image image
+                                              :dir "./dataset"
+                                              :filename label
+                                              :ui? ui?})]
+                 (on-update {:src filepath :label label}))
+               (on-update {:label label}))))))
      keep-running?)))
 
-(defn prepare! []
+(defn start! []
   (bi/init)
-  (pipeline-v1 {}))
-
-;(prepare!)
-;(reset! keep-running? false)
+  (pipeline-v2 {:on-update (partial trade! SYMBOL)}))
