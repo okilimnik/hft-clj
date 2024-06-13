@@ -1,9 +1,6 @@
 (ns hft.core
   (:gen-class)
-  (:require [clojure.string :as str]
-            [clojure.tools.cli :refer [parse-opts]]
-            [hft.dataset :as dataset]
-            [hft.trade :as trade]))
+  (:require [hft.dataset :as dataset]))
 
 (defn -main [& args]
   (dataset/start!))

@@ -1,16 +1,11 @@
-FROM nvidia/cuda:11.7.1-cudnn8-runtime-ubuntu20.04
-
-ENV JAVA_HOME=/opt/graalvm-community-java21
-COPY --from=ghcr.io/graalvm/graalvm-community:21 $JAVA_HOME $JAVA_HOME
-ENV PATH="${JAVA_HOME}/bin:${PATH}"
+FROM ghcr.io/graalvm/graalvm-community:21
 
 COPY target/hft.jar ./
+COPY binance.config.edn ./
 COPY gcp.json ./
 ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
-CMD ["java", "-jar", "app.jar", "-r"]
+CMD ["java", "-XX:+UseZGC", "-jar", "app.jar"]
 
-# docker build -t neusa .
-# docker tag neusa asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest
+# docker build -t neusa-trade .
+# docker tag neusa-trade asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest
 # docker push asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft
-
-# GOOGLE_APPLICATION_CREDENTIALS=/Users/okilimnik/Projects/hft-clj/gcp.json java -jar target/hft.jar -r
