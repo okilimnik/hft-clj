@@ -16,7 +16,7 @@
   (bi/open-order! (create-order-params symbol side)))
 
 (defn prediction->order-side [prediction]
-  )
+  nil)
 
 (defn trade! [symbol prediction]
   (when-let [side (prediction->order-side prediction)]
