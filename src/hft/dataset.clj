@@ -19,11 +19,11 @@
     (cond
       (and
        (> sum-b sum-g)
-       (> diff THRESHOLD)) "sell"
+       (> diff THRESHOLD)) :sell
       (and
        (< sum-b sum-g)
-       (> diff THRESHOLD)) "buy"
-      :else "wait")))
+       (> diff THRESHOLD)) :buy
+      :else :none)))
 
 (defn get-price-level [price interval]
   (-> (/ price interval)
