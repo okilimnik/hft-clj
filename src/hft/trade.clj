@@ -1,36 +1,45 @@
 (ns hft.trade
-  (:require [environ.core :refer [env]]
-            [hft.market.binance :as bi]
-            [taoensso.timbre :as log]
-            [clojure.test :as t]
-            [clojure.string :as str]))
+  (:require [hft.market.binance :as bi]
+            [taoensso.timbre :as log]))
 
 (def TRADE-AMOUNT-BTC 0.0005)
-(def opened-order (atom (keyword (or (env :opened-order) "none"))))
+(def opened-order (atom nil))
 
 (defn create-order-params [symbol side]
   {"symbol" symbol
-   "side" (str/upper-case (name side)) ;"BUY" "SELL"
+   "side" side ;"BUY" "SELL"
    "type" "MARKET"
    "quantity" TRADE-AMOUNT-BTC})
 
 (defn open-order! [symbol side]
   (log/debug "open-order! triggered")
   (bi/open-order! (create-order-params symbol side))
-  (if (= @opened-order :none)
+  (if (nil? @opened-order)
     (reset! opened-order side)
-    (reset! opened-order :none)))
+    (reset! opened-order nil)))
 
-(defn prediction->order-side [prediction]
+(defn prediction->order-side [{:keys [buy? sell? wait? close-buy? close-sell?]}]
   (cond
-    (and (= @opened-order :none)
-         (not= prediction :none)) prediction
-    (and (= @opened-order :buy)
-         (#{:none :sell} prediction)) :sell
-    (and (= @opened-order :sell)
-         (#{:none :buy} prediction)) :buy
-    :else nil))
+    (and (nil? @opened-order)
+         (not wait?)
+         buy?) "BUY"
+    (and (nil? @opened-order)
+         (not wait?)
+         sell?) "SELL"
+    (and (= @opened-order "BUY")
+         close-buy?) "SELL"
+    (and (= @opened-order "SELL")
+         close-sell?) "BUY"))
 
 (defn trade! [symbol prediction]
+  (prn "prediction: " prediction)
   (when-let [side (prediction->order-side prediction)]
-    (open-order! symbol side)))
+    #_(open-order! symbol side)))
+
+(defn update-state! []
+  (let [btc-amount (:free (first (filter #(= (:asset %) "BTC") (:balances (bi/account! {})))))]
+    (prn "btc-amount: " btc-amount)
+    (prn "(bi/account! {}): " (bi/account! {}))
+    #_(cond
+      (> btc-amount 0.0009) (reset! opened-order "BUY")
+      (< btc-amount 0.0004) (reset! opened-order "SELL"))))

@@ -11,19 +11,31 @@
 (def MAX-QUANTITY 50)
 (def PRICE-INTERVAL-FOR-INDEXING 25)
 (def THRESHOLD  (or (env :threshold) 200))
+(def CLOSE-THRESHOLD  (or (env :close-threshold) 50))
 
-(defn calc-label [data]
+(defn get-prediction [data]
   (let [sum-b (apply + (map #(apply + %) (map :b data)))
         sum-g (apply + (map #(apply + %) (map :g data)))
         diff (abs (- sum-b sum-g))]
-    (cond
+    (prn "sum-b: " sum-b)
+    (prn "sum-g: " sum-g)
+    (prn "diff: " diff)
+    (cond-> {:sell? false :buy? false :wait? false :close-sell? false :close-buy? false}
+      (> sum-b sum-g) (assoc :close-buy? true)
+      (< sum-b sum-g) (assoc :close-sell? true)
       (and
        (> sum-b sum-g)
-       (> diff THRESHOLD)) :sell
+       (<= diff CLOSE-THRESHOLD)) (assoc :close-sell? true)
       (and
        (< sum-b sum-g)
-       (> diff THRESHOLD)) :buy
-      :else :none)))
+       (<= diff CLOSE-THRESHOLD)) (assoc :close-buy? true)
+      (< diff THRESHOLD) (assoc :wait? true)
+      (and
+       (< sum-b sum-g)
+       (> diff THRESHOLD)) (assoc :buy? true)
+      (and
+       (> sum-b sum-g)
+       (> diff THRESHOLD)) (assoc :sell? true))))
 
 (defn get-price-level [price interval]
   (-> (/ price interval)
@@ -84,16 +96,19 @@
          (when (= (count @input) (dec (+ INPUT-SIZE LABEL-QUEUE-SIZE)))
            (let [image (du/->image {:data (take INPUT-SIZE @input)
                                     :max-value MAX-QUANTITY})
-                 label (calc-label (take INPUT-SIZE @input))]
+                 {:keys [buy? sell?] :as prediction} (get-prediction (take INPUT-SIZE @input))
+                 label (cond
+                         buy? "buy"
+                         sell? "sell"
+                         :else "wait")]
              (if ui?
                (let [filepath (du/save-image {:image image
                                               :dir "./dataset"
                                               :filename label
                                               :ui? ui?})]
                  (on-update {:src filepath :label label}))
-               (on-update {:label label}))))))
+               (on-update prediction))))))
      keep-running?)))
 
 (defn start! []
-  (bi/init)
   (pipeline-v2 {:on-update (partial trade! SYMBOL)}))

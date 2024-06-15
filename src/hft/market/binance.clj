@@ -17,6 +17,9 @@
 (defn open-order! [params]
   (jread (.newOrder @trade-client (java.util.HashMap. params))))
 
+(defn account! [params]
+  (jread (.account @trade-client (java.util.HashMap. params))))
+
 (defn get-order! [symbol order-id]
   (jread (.getOrder @trade-client (java.util.HashMap. {"symbol" symbol
                                                        "orderId" order-id
