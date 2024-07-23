@@ -34,12 +34,10 @@
 (defn trade! [symbol prediction]
   (prn "prediction: " prediction)
   (when-let [side (prediction->order-side prediction)]
-    #_(open-order! symbol side)))
+    (open-order! symbol side)))
 
 (defn update-state! []
-  (let [btc-amount (:free (first (filter #(= (:asset %) "BTC") (:balances (bi/account! {})))))]
-    (prn "btc-amount: " btc-amount)
-    (prn "(bi/account! {}): " (bi/account! {}))
-    #_(cond
-      (> btc-amount 0.0009) (reset! opened-order "BUY")
-      (< btc-amount 0.0004) (reset! opened-order "SELL"))))
+  (let [btc-amount (parse-double (:free (first (filter #(= (:asset %) "BTC") (:balances (bi/account! {}))))))]
+    (cond
+      (> btc-amount 0.00075) (reset! opened-order "BUY")
+      (< btc-amount 0.00075) (reset! opened-order "SELL"))))
