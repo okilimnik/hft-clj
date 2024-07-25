@@ -52,7 +52,7 @@
     (i/set-pixels image pixels)
     image))
 
-(defn save-image [{:keys [image dir filename ui?] :or {ui? false}}]
+(defn save-image1 [{:keys [image dir filename ui?] :or {ui? false}}]
   (init-image-counter)
   (let [dir (io/file dir)]
     (when-not (.exists dir)
@@ -63,4 +63,15 @@
       (when-not ui?
         (upload-file! indexed-filename filepath)
         (io/delete-file filepath))
+      filepath)))
+
+(defn save-image [{:keys [image dir filename ui?] :or {ui? false}}]
+  (let [dir (io/file dir)]
+    (when-not (.exists dir)
+      (.mkdirs dir))
+    (let [indexed-filename (str (System/currentTimeMillis) ".png")
+          filepath (str dir "/" indexed-filename)]
+      (i/save image filepath)
+      (upload-file! indexed-filename filepath)
+      (io/delete-file filepath)
       filepath)))
