@@ -15,7 +15,8 @@
         ai.djl/api                               {:mvn/version "0.25.0"}
         ai.djl/basicdataset                      {:mvn/version "0.25.0"}
         ai.djl/model-zoo                         {:mvn/version "0.25.0"}
-        org.apache.commons/commons-lang3         {:mvn/version "3.14.0"}}
+        org.apache.commons/commons-lang3         {:mvn/version "3.14.0"}
+        org.apache.commons/commons-math3         {:mvn/version "3.6.1"}}
  :aliases {:uberjar {:replace-deps  {uberdeps/uberdeps {:mvn/version "1.3.0"}}
                      :replace-paths []
                      :main-opts     ["-m" "uberdeps.uberjar"]}}}

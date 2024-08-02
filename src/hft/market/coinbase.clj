@@ -8,7 +8,7 @@
 (def symbol-mapper 
   {"BTCUSDT" "btc-usdt"})
 
-(defn depth! [symbol]
-  (jread (:body (http/get (str "https://api.exchange.coinbase.com/products/" (get symbol-mapper symbol) "/book?level=2") {:accept :json}))))
+(defn depth! [sym _limit]
+  (jread (:body (http/get (str "https://api.exchange.coinbase.com/products/" (get symbol-mapper sym) "/book?level=3") {:accept :json}))))
 
 ;(prn (depth! "BTCUSDT"))

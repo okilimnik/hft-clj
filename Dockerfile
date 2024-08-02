@@ -5,7 +5,7 @@ COPY binance.config.edn ./
 COPY gcp.json ./
 COPY image-counter.txt ./
 ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
-CMD ["java", "-XX:+UseZGC", "-jar", "hft.jar", "-d"]
+CMD ["java", "-jar", "hft.jar", "-d"]
 
 # docker build -f Dockerfile.ds -t neusa-ds .
 # docker tag neusa-ds asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest

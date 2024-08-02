@@ -1,29 +1,8 @@
 (ns hft.data
   (:require [clojure.java.io :as io]
             [mikera.image.core :as i]
-            [hft.gcloud :refer [upload-file!]]
-            [clojure.string :as str])
+            [hft.gcloud :refer [upload-file!]])
   (:import [java.awt Color]))
-
-(def image-counter (atom nil))
-(def IMAGE-COUNTER-FILE "./image-counter.txt")
-
-(defn- get-image-number! []
-  (let [new-val (swap! image-counter inc)
-        max-l 10]
-    (spit IMAGE-COUNTER-FILE (str new-val))
-    (let [s (str (str/join (repeat max-l "0")) new-val)
-          l (count s)]
-      (subs s (- l max-l) l))))
-
-(defn- init-image-counter []
-  (when-not @image-counter
-    (let [init-val (parse-long
-                    (try
-                      (slurp IMAGE-COUNTER-FILE)
-                      (catch Exception _
-                        "0")))]
-      (reset! image-counter init-val))))
 
 (defn ->image
   "int[] pixels - 1-dimensional Java array, which length is width * height"
@@ -52,19 +31,6 @@
     (i/set-pixels image pixels)
     image))
 
-(defn save-image1 [{:keys [image dir filename ui?] :or {ui? false}}]
-  (init-image-counter)
-  (let [dir (io/file dir)]
-    (when-not (.exists dir)
-      (.mkdirs dir))
-    (let [indexed-filename (str (get-image-number!) "_" filename ".png")
-          filepath (str dir "/" indexed-filename)]
-      (i/save image filepath)
-      (when-not ui?
-        (upload-file! indexed-filename filepath)
-        (io/delete-file filepath))
-      filepath)))
-
 (defn save-image [{:keys [image dir filename ui?] :or {ui? false}}]
   (let [dir (io/file dir)]
     (when-not (.exists dir)
@@ -72,6 +38,7 @@
     (let [indexed-filename (str (System/currentTimeMillis) ".png")
           filepath (str dir "/" indexed-filename)]
       (i/save image filepath)
-      (upload-file! indexed-filename filepath)
-      (io/delete-file filepath)
+      (when-not ui?
+        (upload-file! indexed-filename filepath)
+        (io/delete-file filepath))
       filepath)))
