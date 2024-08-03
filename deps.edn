@@ -2,25 +2,17 @@
  :deps {org.clojure/clojure                      {:mvn/version "1.11.1"}
         org.clojure/core.async                   {:mvn/version "1.6.681"}
         org.clojure/tools.cli                    {:mvn/version "1.0.219"}
-        clj-http/clj-http                        {:mvn/version "3.12.3"}
+        org.martinklepsch/clj-http-lite          {:mvn/version "0.4.3"}
         com.taoensso/timbre                      {:mvn/version "6.3.1"}
         com.fzakaria/slf4j-timbre                {:mvn/version "0.4.0"}
         io.github.humbleui/humbleui              {:git/sha "321a27826b6dca2e35bde3b6ec0fc261f2e71121"}
         nrepl/nrepl                              {:mvn/version "1.0.0"}
-        net.mikera/imagez                        {:mvn/version "0.12.0"}
         io.github.binance/binance-connector-java {:mvn/version "3.2.0"}
         metosin/jsonista                         {:mvn/version "0.3.8"}
         com.google.cloud/google-cloud-storage    {:mvn/version "2.25.0"}
-        ai.djl.pytorch/pytorch-engine            {:mvn/version "0.25.0"}
-        ai.djl/api                               {:mvn/version "0.25.0"}
-        ai.djl/basicdataset                      {:mvn/version "0.25.0"}
-        ai.djl/model-zoo                         {:mvn/version "0.25.0"}
         org.apache.commons/commons-lang3         {:mvn/version "3.14.0"}
-        org.apache.commons/commons-math3         {:mvn/version "3.6.1"}}
+        org.apache.commons/commons-math3         {:mvn/version "3.6.1"}
+        com.github.clj-easy/graal-build-time     {:mvn/version "1.0.5"}}
  :aliases {:uberjar {:replace-deps  {uberdeps/uberdeps {:mvn/version "1.3.0"}}
                      :replace-paths []
                      :main-opts     ["-m" "uberdeps.uberjar"]}}}
-
-;; clj -M -e "(compile 'hft.core)"
-;; clj -M:uberjar --main-class hft.core
-;; java -jar target/hft.jar -d

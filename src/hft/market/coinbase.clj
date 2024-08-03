@@ -1,6 +1,6 @@
 (ns hft.market.coinbase
   (:require [jsonista.core :as j]
-            [clj-http.client :as http]))
+            [clj-http.lite.client :as http]))
 
 (defn jread [v]
   (j/read-value v j/keyword-keys-object-mapper))
