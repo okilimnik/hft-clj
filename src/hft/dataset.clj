@@ -17,8 +17,6 @@
   (let [stats (DescriptiveStatistics. (into-array Double/TYPE x))]
     (.getSkewness stats)))
 
-(get-skewness [0 0 0 0 0 0 0 0 0 0 110.84224000000043 24.34152 17.711549999999995 5.503300000000007 18.23046999999995 7.101640000000011 23.25289999999994 6.691200000000007 0 0])
-
 (defn get-kurtosis [x]
   (let [stats (DescriptiveStatistics. (into-array Double/TYPE x))]
     (.getKurtosis stats)))
