@@ -1,5 +1,5 @@
 (ns hft.dataset
-  (:require [hft.async :refer [vthread]]
+  (:require [clojure.pprint :refer [pprint]]
             [hft.data :as du]
             [hft.market :as market]
             [hft.scheduler :as scheduler])
@@ -17,52 +17,56 @@
   (let [stats (DescriptiveStatistics. (into-array Double/TYPE x))]
     (.getSkewness stats)))
 
+(get-skewness [0 0 0 0 0 0 0 0 0 0 110.84224000000043 24.34152 17.711549999999995 5.503300000000007 18.23046999999995 7.101640000000011 23.25289999999994 6.691200000000007 0 0])
+
 (defn get-kurtosis [x]
   (let [stats (DescriptiveStatistics. (into-array Double/TYPE x))]
     (.getKurtosis stats)))
 
-(defn get-image-column [min-level max-level price-interval prices]
+(defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
          result (vec (repeat INPUT-SIZE 0))]
     (if (seq prices)
       (let [[price-str qty-str] (first prices)
             price (parse-double price-str)
             qty (parse-double qty-str)]
-        (if (and (< price max-level) (>= price min-level))
-          (let [level (int (/ (* (- price min-level) INPUT-SIZE) price-interval))]
+        (if (and (< price max-price) (>= price min-price))
+          (let [level (int (/ (* (- price min-price) INPUT-SIZE) price-interval))]
             (recur (rest prices) (update result level #(+ (or % 0) qty))))
           result))
       result)))
 
-(defn get-min-level [mid-level]
-  (- mid-level (* PRICE-INTERVAL-FOR-INDEXING (/ INPUT-SIZE 2))))
+(defn get-min-price [mid-price]
+  (- mid-price (* PRICE-INTERVAL-FOR-INDEXING (/ INPUT-SIZE 2))))
 
-(defn get-max-level [mid-level]
-  (+ mid-level (* PRICE-INTERVAL-FOR-INDEXING (/ INPUT-SIZE 2))))
+(defn get-max-price [mid-price]
+  (+ mid-price (* PRICE-INTERVAL-FOR-INDEXING (/ INPUT-SIZE 2))))
 
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
-  (let [mid-level max-bid
-        min-level (get-min-level mid-level)
-        max-level (get-max-level mid-level)
-        price-interval (- max-level min-level)
-        b (get-image-column min-level max-level price-interval (:bids order-book))
-        g (get-image-column min-level max-level price-interval (:asks order-book))]
-    {:b b
-     :skewness-b (get-skewness (subvec b 10))
-     :kurtosis-b (get-kurtosis (subvec b 10))
-     :g g
-     :skewness-g (get-skewness (subvec g 0 10))
-     :kurtosis-g (get-kurtosis (subvec g 0 10))}))
+  (let [mid-price max-bid
+        min-price (get-min-price mid-price)
+        max-price (get-max-price mid-price)
+        price-interval (- max-price min-price)
+        bids (get-image-column min-price max-price price-interval (:bids order-book))
+        asks (get-image-column min-price max-price price-interval (:asks order-book))]
+    {:bids bids
+     :skewness-bids (get-skewness (subvec bids 0 10))
+     :kurtosis-bids (get-kurtosis (subvec bids 0 10))
+     :asks asks
+     :skewness-asks (get-skewness (subvec asks 10))
+     :kurtosis-asks (get-kurtosis (subvec asks 10))}))
 
 (defn save-order-books [market inputs ui? on-update]
-  (prn "skewness-b: " (mapv :skewness-b inputs))
-  (prn "kurtosis-b: " (mapv :kurtosis-b inputs))
-  (prn "skewness-g: " (mapv :skewness-g inputs))
-  (prn "kurtosis-g: " (mapv :kurtosis-g inputs))
   (let [image (du/->image {:data inputs
                            :max-value (get MAX-QUANTITY market)})
         label ""
         filepath  (du/save-image {:image image
+                                  :metadata (with-out-str
+                                              (pprint
+                                               {:skewness-asks (mapv :skewness-asks inputs)
+                                                :skewness-bids (mapv :skewness-bids inputs)
+                                                :kurtosis-bids (mapv :kurtosis-bids inputs)
+                                                :kurtosis-asks (mapv :kurtosis-asks inputs)}))
                                   :dir "./dataset"
                                   :filename label
                                   :ui? ui?})]
@@ -89,6 +93,7 @@
            (save-order-books market @inputs ui? on-update))))
      keep-running?)))
 
-(defn prepare! [market]
-  (market/init market)
-  (pipeline-v1 {:market market}))
+(defn prepare! [& markets]
+  (doseq [market markets]
+    (market/init market)
+    (pipeline-v1 {:market market})))

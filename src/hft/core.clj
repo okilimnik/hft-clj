@@ -22,7 +22,7 @@
   (let [{:keys [options _arguments errors _summary]} (parse-opts args cli-options)]
     (cond
       errors (println (error-msg errors))
-      (:dataset options) (dataset/prepare! :binance)
+      (:dataset options) (dataset/prepare! :binance :kraken)
       (:network options) (train/start!)
       (:trade options) (trade/start!)
       :else (println "No command provided, exiting..."))))
