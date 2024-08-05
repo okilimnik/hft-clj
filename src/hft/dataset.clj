@@ -66,7 +66,7 @@
                                                 :kurtosis-bids (mapv :kurtosis-bids inputs)
                                                 :kurtosis-asks (mapv :kurtosis-asks inputs)}))
                                   :dir "./dataset"
-                                  :folder market
+                                  :folder (name market)
                                   :filename label
                                   :ui? ui?})]
     (on-update {:src filepath :label label})))

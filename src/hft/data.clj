@@ -32,9 +32,9 @@
       (.mkdirs dir))
     (let [timestamp (System/currentTimeMillis)
           image-filename (str timestamp ".png")
-          image-filepath (str dir "/" folder "/"image-filename)
+          image-filepath (str dir "/" image-filename)
           metadata-filename (str timestamp ".edn")
-          metadata-filepath (str dir "/" folder "/" metadata-filename)]
+          metadata-filepath (str dir "/" metadata-filename)]
       (i/save image image-filepath :quality 1.0)
       (when metadata
         (spit metadata-filepath metadata))
