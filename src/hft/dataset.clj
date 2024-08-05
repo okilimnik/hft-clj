@@ -74,7 +74,7 @@
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)]
     (scheduler/start!
-     10000
+     3000
      (fn []
        (let [order-book (market/depth! market SYMBOL 5000)]
          (swap! max-bids #(as-> % $

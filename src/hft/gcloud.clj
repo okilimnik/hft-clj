@@ -11,7 +11,7 @@
 (defn upload-file! [filename filepath]
   (try
     (when-not @storage (init!))
-    (let [blob-id (BlobId/of bucket-name (str "order_book_03_08_2024/" filename))
+    (let [blob-id (BlobId/of bucket-name (str "order_book_05_08_2024/" filename))
           blob-info (.build (BlobInfo/newBuilder blob-id))]
       (.createFrom @storage blob-info (io/input-stream (io/file filepath)) (into-array Storage$BlobWriteOption [])))
     (catch Exception e (prn e))))

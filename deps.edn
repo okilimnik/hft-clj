@@ -5,6 +5,7 @@
         org.martinklepsch/clj-http-lite          {:mvn/version "0.4.3"}
         com.taoensso/timbre                      {:mvn/version "6.3.1"}
         com.fzakaria/slf4j-timbre                {:mvn/version "0.4.0"}
+        net.mikera/imagez                        {:mvn/version "0.12.0"}
         io.github.humbleui/humbleui              {:git/sha "321a27826b6dca2e35bde3b6ec0fc261f2e71121"}
         nrepl/nrepl                              {:mvn/version "1.0.0"}
         io.github.binance/binance-connector-java {:mvn/version "3.2.0"}
