@@ -26,21 +26,21 @@
     (i/set-pixels image pixels)
     (Scalr/rotate image Scalr$Rotation/CW_270 nil)))
 
-(defn save-image [{:keys [image dir ui? metadata] :or {ui? false}}]
-  (let [dir (io/file dir)]
+(defn save-image [{:keys [image dir ui? folder metadata] :or {ui? false}}]
+  (let [dir (io/file dir folder)]
     (when-not (.exists dir)
       (.mkdirs dir))
     (let [timestamp (System/currentTimeMillis)
           image-filename (str timestamp ".png")
-          image-filepath (str dir "/" image-filename)
+          image-filepath (str dir "/" folder "/"image-filename)
           metadata-filename (str timestamp ".edn")
-          metadata-filepath (str dir "/" metadata-filename)]
+          metadata-filepath (str dir "/" folder "/" metadata-filename)]
       (i/save image image-filepath :quality 1.0)
       (when metadata
         (spit metadata-filepath metadata))
       (when-not ui?
-        (upload-file! image-filename image-filepath)
+        (upload-file! (str folder "/" image-filename) image-filepath)
         (io/delete-file image-filepath)
-        (upload-file! metadata-filename metadata-filepath)
+        (upload-file! (str folder "/" metadata-filename) metadata-filepath)
         (io/delete-file metadata-filepath))
       image-filepath)))
