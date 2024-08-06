@@ -1,9 +1,6 @@
 #!/bin/sh
 
-rm -rf classes
-mkdir classes
-clj -M -e "(compile 'hft.core)"  
-clj -M:uberjar --main-class hft.core
+lein do clean, uberjar
 lein native
 
 #docker build -t neusa .

@@ -1,7 +1,7 @@
-FROM ghcr.io/graalvm/graalvm-community:21
+FROM proton:latest
 
-COPY target/hft.jar ./
+COPY target/hft ./
 COPY binance.config.edn ./
 COPY gcp.json ./
 ENV GOOGLE_APPLICATION_CREDENTIALS=./gcp.json
-CMD ["java", "-jar", "hft.jar", "-d"]
+CMD ["./hft", "-d"]
