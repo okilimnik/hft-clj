@@ -1,8 +1,8 @@
 (ns hft.data
   (:require [clojure.java.io :as io]
             [clojure.math :refer [ceil]]
-            [mikera.image.core :as i]
-            [hft.gcloud :refer [upload-file!]])
+            [hft.image :as i]
+            #_[hft.gcloud :refer [upload-file!]])
   (:import [java.awt Color]
            [org.imgscalr Scalr Scalr$Rotation]))
 
@@ -39,8 +39,8 @@
       (when metadata
         (spit metadata-filepath metadata))
       (when-not ui?
-        (upload-file! (str folder "/" image-filename) image-filepath)
+        #_(upload-file! (str folder "/" image-filename) image-filepath)
         (io/delete-file image-filepath)
-        (upload-file! (str folder "/" metadata-filename) metadata-filepath)
+        #_(upload-file! (str folder "/" metadata-filename) metadata-filepath)
         (io/delete-file metadata-filepath))
       image-filepath)))

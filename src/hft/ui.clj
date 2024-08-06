@@ -1,10 +1,8 @@
 (ns ^{:skip-aot true} hft.ui
   (:require [clojure.java.io :as io]
-            [clojure.core.async :refer [thread]]
             [io.github.humbleui.ui :as ui]
             [hft.ui.state :as state]
-            [hft.dataset :as dataset]
-            [hft.market.binance :as bi]))
+            [hft.dataset :as dataset]))
 
 
 (def root
@@ -21,8 +19,7 @@
 
 
 (defn -main [& args]
-  (bi/init)
-  (thread
+  (Thread.
     (dataset/pipeline-v1 {:on-update state/update-input-image
                           :ui? true}))
   (ui/start-app!

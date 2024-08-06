@@ -1,15 +1,10 @@
 (ns hft.market.binance
   (:require [jsonista.core :as j]
-            [clojure.edn :as edn])
-  (:import [com.binance.connector.client.impl SpotClientImpl]))
+            [clojure.edn :as edn]
+            [clj-http.lite.client :as http]))
 
 (def trade-client (atom nil))
 (def market-client (atom nil))
-
-(defn init []
-  (let [config (:prod (edn/read-string (slurp "binance.config.edn")))]
-    (reset! trade-client (.createTrade (SpotClientImpl. (:apiKey config) (:secret config) (:url config))))
-    (reset! market-client (.createMarket (SpotClientImpl. (:url config))))))
 
 (defn jread [v]
   (j/read-value v j/keyword-keys-object-mapper))
@@ -33,7 +28,4 @@
       jread))
 
 (defn depth! [symbol limit]
-  (jread (.depth @market-client (java.util.HashMap. {"symbol" symbol "limit" limit}))))
-
-(defn best-price! [symbol]
-  (jread (.bookTicker @market-client (java.util.HashMap. {"symbol" symbol}))))
+  (jread (:body (http/get (str symbol limit) {:accept :json}))))

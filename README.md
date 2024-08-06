@@ -1,4 +1,7 @@
 ## Build native image (doesn't work)
+for MacOS you may need to invoke:
+ $ sudo xattr -r -d com.apple.quarantine ${GRAALVM_HOME}
+
 ~/graalvm-jdk-21.0.1+12.1/Contents/Home/lib/svm/bin/native-image -jar target/hft.jar --features=clj_easy.graal_build_time.InitClojureClasses --no-fallback --no-server target/hft
 
 ## Key Points

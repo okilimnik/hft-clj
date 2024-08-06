@@ -75,7 +75,7 @@
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)]
     (scheduler/start!
-     3000
+     10000
      (fn []
        (let [order-book (market/depth! market SYMBOL 5000)]
          (swap! max-bids #(as-> % $
@@ -93,6 +93,6 @@
      keep-running?)))
 
 (defn prepare! [& markets]
-  (doseq [market markets]
-    (market/init market)
-    (pipeline-v1 {:market market})))
+  (doseq [market (rest markets)]
+    (Thread. (pipeline-v1 {:market market})))
+  (pipeline-v1 {:market (first markets)}))
