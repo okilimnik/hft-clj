@@ -9,6 +9,7 @@
                  [org.imgscalr/imgscalr-lib "4.2"]
                  [nrepl/nrepl "1.0.0"]
                  [metosin/jsonista "0.3.8"]
+                 [alekcz/fire "0.5.1-SNAPSHOT"]
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.github.clj-easy/graal-build-time "1.0.5"]]
   :main hft.core

@@ -9,12 +9,8 @@
   {"BTCUSDT" "XBTUSDT"})
 
 (defn depth! [sym limit]
-  (let [result (get (:result (jread (:body (http/get (str "https://api.kraken.com/0/public/Depth")
-                                                     {:accept :json
-                                                      :query-params {"pair" (get symbol-mapper sym)
-                                                                     "count" limit}}))))
-                    (keyword (get symbol-mapper sym)))]
-    ;(spit "kraken.edn" result)
-    result))
-
-;(prn (depth! "BTCUSDT"))
+  (get (:result (jread (:body (http/get (str "https://api.kraken.com/0/public/Depth")
+                                        {:accept :json
+                                         :query-params {"pair" (get symbol-mapper sym)
+                                                        "count" limit}}))))
+       (keyword (get symbol-mapper sym))))

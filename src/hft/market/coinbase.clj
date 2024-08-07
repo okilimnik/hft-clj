@@ -10,5 +10,3 @@
 
 (defn depth! [sym _limit]
   (jread (:body (http/get (str "https://api.exchange.coinbase.com/products/" (get symbol-mapper sym) "/book?level=3") {:accept :json}))))
-
-;(prn (depth! "BTCUSDT"))
