@@ -13,6 +13,6 @@
     (str/ends-with? ".edn" filename) "text/plain"
     (str/ends-with? ".png" filename) "image/png"))
 
-(defn upload-file! [filename filepath]
+(defn upload-file! [filepath folder filename]
   (when-not @token (init!))
-  (storage/upload! filepath (str "order_book_06_08_2024/" filename) (get-mime-type filename) @token))
+  (storage/upload! (str "order_book_08_08_2024/" folder "/" filename) filepath (get-mime-type filename) @token))

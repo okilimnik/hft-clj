@@ -4,6 +4,8 @@
             [clojure.tools.cli :refer [parse-opts]]
             [hft.dataset :as dataset]))
 
+(set! *warn-on-reflection* true)
+
 (def cli-options
   [["-d" "--dataset" "Prepare dataset"
     :id :dataset]

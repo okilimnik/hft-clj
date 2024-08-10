@@ -1,5 +1,6 @@
 (ns hft.dataset
-  (:require [clojure.pprint :refer [pprint]]
+  (:require [clojure.core.async :refer [thread]]
+            [clojure.pprint :refer [pprint]]
             [hft.data :as du]
             [hft.market :as market]
             [hft.scheduler :as scheduler])
@@ -14,11 +15,11 @@
 
 
 (defn get-skewness [x]
-  (let [stats (DescriptiveStatistics. (into-array Double/TYPE x))]
+  (let [^DescriptiveStatistics stats (DescriptiveStatistics. (into-array Double/TYPE x))]
     (.getSkewness stats)))
 
 (defn get-kurtosis [x]
-  (let [stats (DescriptiveStatistics. (into-array Double/TYPE x))]
+  (let [^DescriptiveStatistics stats (DescriptiveStatistics. (into-array Double/TYPE x))]
     (.getKurtosis stats)))
 
 (defn get-image-column [min-price max-price price-interval prices]
@@ -48,11 +49,11 @@
         bids (get-image-column min-price max-price price-interval (:bids order-book))
         asks (get-image-column min-price max-price price-interval (:asks order-book))]
     {:bids bids
-     :skewness-bids (get-skewness (subvec bids 0 10))
-     :kurtosis-bids (get-kurtosis (subvec bids 0 10))
+     :skewness-bids (get-skewness (subvec bids 0 (/ INPUT-SIZE 2)))
+     :kurtosis-bids (get-kurtosis (subvec bids 0 (/ INPUT-SIZE 2)))
      :asks asks
-     :skewness-asks (get-skewness (subvec asks 10))
-     :kurtosis-asks (get-kurtosis (subvec asks 10))}))
+     :skewness-asks (get-skewness (subvec asks (/ INPUT-SIZE 2)))
+     :kurtosis-asks (get-kurtosis (subvec asks (/ INPUT-SIZE 2)))}))
 
 (defn save-order-books [market inputs ui? on-update]
   (let [image (du/->image {:data inputs
@@ -65,7 +66,7 @@
                                                 :skewness-bids (mapv :skewness-bids inputs)
                                                 :kurtosis-bids (mapv :kurtosis-bids inputs)
                                                 :kurtosis-asks (mapv :kurtosis-asks inputs)}))
-                                  :dir "./dataset"
+                                  :dataset-dir "./dataset"
                                   :folder (name market)
                                   :filename label
                                   :ui? ui?})]
@@ -94,5 +95,5 @@
 
 (defn prepare! [& markets]
   (doseq [market (rest markets)]
-    (Thread. (pipeline-v1 {:market market})))
+    (thread (pipeline-v1 {:market market})))
   (pipeline-v1 {:market (first markets)}))
