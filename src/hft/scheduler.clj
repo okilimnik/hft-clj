@@ -7,5 +7,5 @@
         (if (>= current-t scheduled-t)
           (do (f)
               (recur (+ scheduled-t interval)))
-          (do (Thread/sleep (- scheduled-t current-t))
+          (do (Thread/sleep ^long (- scheduled-t current-t))
               (recur scheduled-t)))))))

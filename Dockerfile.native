@@ -1,0 +1,9 @@
+FROM container-registry.oracle.com/graalvm/native-image:22 AS base
+
+WORKDIR /src
+COPY target/hft.jar ./
+RUN native-image --report-unsupported-elements-at-runtime --features=clj_easy.graal_build_time.InitClojureClasses --no-fallback --no-server --enable-url-protocols=https -jar /src/hft.jar -H:Name=/src/hft
+
+FROM debian:bookworm-slim
+COPY --from=base /src/hft /src/hft
+CMD ["/src/hft", "-d"]

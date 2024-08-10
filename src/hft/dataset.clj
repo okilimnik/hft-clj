@@ -3,8 +3,8 @@
             [clojure.pprint :refer [pprint]]
             [hft.data :as du]
             [hft.market :as market]
-            [hft.scheduler :as scheduler])
-  (:import [org.apache.commons.math3.stat.descriptive DescriptiveStatistics]))
+            [hft.scheduler :as scheduler]
+            [kixi.stats.core :refer [skewness kurtosis]]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
@@ -13,14 +13,18 @@
 
 (def keep-running? (atom true))
 
+(defn normalize [s]
+  (let [max! (apply max s)
+        min! (apply min s)]
+    (mapv #(/ (- % min!) (- max! min!)) s)))
 
 (defn get-skewness [x]
-  (let [^DescriptiveStatistics stats (DescriptiveStatistics. (into-array Double/TYPE x))]
-    (.getSkewness stats)))
+  (->> x
+       (transduce (map identity) skewness)))
 
 (defn get-kurtosis [x]
-  (let [^DescriptiveStatistics stats (DescriptiveStatistics. (into-array Double/TYPE x))]
-    (.getKurtosis stats)))
+  (->> x
+       (transduce (map identity) kurtosis)))
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -41,6 +45,16 @@
 (defn get-max-price [mid-price]
   (+ mid-price (* PRICE-INTERVAL-FOR-INDEXING (/ INPUT-SIZE 2))))
 
+(defn get-levels-with-max-qty-sorted [prices]
+  (->> (map-indexed vector prices)
+       (sort-by second >)
+       (map first)
+       (take 3)
+       vec))
+
+(defn get-distance-from-terminator [prices terminator]
+  (abs (- (first (get-levels-with-max-qty-sorted prices)) terminator)))
+
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
         min-price (get-min-price mid-price)
@@ -49,11 +63,11 @@
         bids (get-image-column min-price max-price price-interval (:bids order-book))
         asks (get-image-column min-price max-price price-interval (:asks order-book))]
     {:bids bids
-     :skewness-bids (get-skewness (subvec bids 0 (/ INPUT-SIZE 2)))
-     :kurtosis-bids (get-kurtosis (subvec bids 0 (/ INPUT-SIZE 2)))
+     :bid-levels-with-max-qty (get-levels-with-max-qty-sorted bids)
+     :max-bid-distance (get-distance-from-terminator bids 9)
      :asks asks
-     :skewness-asks (get-skewness (subvec asks (/ INPUT-SIZE 2)))
-     :kurtosis-asks (get-kurtosis (subvec asks (/ INPUT-SIZE 2)))}))
+     :ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)
+     :max-ask-distance (get-distance-from-terminator asks 10)}))
 
 (defn save-order-books [market inputs ui? on-update]
   (let [image (du/->image {:data inputs
