@@ -2,13 +2,16 @@
   (:gen-class)
   (:require [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
-            [hft.dataset :as dataset]))
+            [hft.dataset :as dataset]
+            [hft.ui :as ui]))
 
 (set! *warn-on-reflection* true)
 
 (def cli-options
   [["-d" "--dataset" "Prepare dataset"
     :id :dataset]
+   ["-i" "--ui" "Run UI"
+    :id :ui]
    ["-n" "--network" "Train network"
     :id :network]
    ["-t" "--trade" "Trade"
@@ -23,4 +26,5 @@
     (cond
       errors (println (error-msg errors))
       (:dataset options) (dataset/prepare! :binance)
+      (:ui options) (ui/start!)
       :else (println "No command provided, exiting..."))))
