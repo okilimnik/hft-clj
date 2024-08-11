@@ -11,7 +11,6 @@
                  [nrepl/nrepl "1.0.0"]
                  [metosin/jsonista "0.3.8"]
                  [alekcz/fire "0.5.1-SNAPSHOT"]
-                 [kixi/stats "0.5.5"]
                  [com.github.clj-easy/graal-build-time "1.0.5"]
                  [com.phronemophobic/membrane "0.14.4-beta"]]
   :main hft.core

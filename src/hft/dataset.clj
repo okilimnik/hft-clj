@@ -3,8 +3,7 @@
             [clojure.pprint :refer [pprint]]
             [hft.data :as du]
             [hft.market :as market]
-            [hft.scheduler :as scheduler]
-            [kixi.stats.core :refer [skewness kurtosis]]))
+            [hft.scheduler :as scheduler]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
@@ -12,19 +11,6 @@
 (def PRICE-INTERVAL-FOR-INDEXING 100)
 
 (def keep-running? (atom true))
-
-(defn normalize [s]
-  (let [max! (apply max s)
-        min! (apply min s)]
-    (mapv #(/ (- % min!) (- max! min!)) s)))
-
-(defn get-skewness [x]
-  (->> x
-       (transduce (map identity) skewness)))
-
-(defn get-kurtosis [x]
-  (->> x
-       (transduce (map identity) kurtosis)))
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -73,17 +59,20 @@
   (let [image (du/->image {:data inputs
                            :max-value (get MAX-QUANTITY market)})
         label ""
-        filepath  (du/save-image {:image image
-                                  :metadata (with-out-str
-                                              (pprint
-                                               {:skewness-asks (mapv :skewness-asks inputs)
-                                                :skewness-bids (mapv :skewness-bids inputs)
-                                                :kurtosis-bids (mapv :kurtosis-bids inputs)
-                                                :kurtosis-asks (mapv :kurtosis-asks inputs)}))
-                                  :dataset-dir "./dataset"
-                                  :folder (name market)
-                                  :filename label
-                                  :ui? ui?})]
+        filepath  (when (or ui? (let [{:keys [max-bid-distance max-ask-distance]} (last inputs)]
+                                  (or (> max-bid-distance 2)
+                                      (> max-ask-distance 2))))
+                    (du/save-image {:image image
+                                    :metadata (with-out-str
+                                                (pprint
+                                                 {:ask-levels-with-max-qty (mapv :ask-levels-with-max-qty inputs)
+                                                  :max-ask-distance (mapv :max-ask-distance inputs)
+                                                  :bid-levels-with-max-qty (mapv :bid-levels-with-max-qty inputs)
+                                                  :max-bid-distance (mapv :max-bid-distance inputs)}))
+                                    :dataset-dir "./dataset"
+                                    :folder (name market)
+                                    :filename label
+                                    :ui? ui?}))]
     (on-update {:src filepath :label label})))
 
 (defn pipeline-v1 [{:keys [on-update ui? market] :or {on-update (fn [_]) market :binance}}]
@@ -108,6 +97,6 @@
      keep-running?)))
 
 (defn prepare! [& markets]
-  (doseq [market (rest markets)]
+  #_(doseq [market (rest markets)]
     (thread (pipeline-v1 {:market market})))
   (pipeline-v1 {:market (first markets)}))

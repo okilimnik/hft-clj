@@ -1,9 +1,13 @@
-FROM container-registry.oracle.com/graalvm/native-image:22 AS base
-
+FROM clojure AS lein
 WORKDIR /src
-COPY target/hft.jar ./
-RUN native-image --report-unsupported-elements-at-runtime --features=clj_easy.graal_build_time.InitClojureClasses --no-fallback --no-server --enable-url-protocols=https -jar /src/hft.jar -H:Name=/src/hft
+COPY . /src
+RUN lein do clean, uberjar
+
+FROM container-registry.oracle.com/graalvm/native-image:22 AS graalvm
+WORKDIR /src
+COPY --from=lein /src/target/hft.jar ./
+RUN native-image -Djava.awt.headless=false --report-unsupported-elements-at-runtime --features=clj_easy.graal_build_time.InitClojureClasses --no-fallback --no-server --enable-url-protocols=https -jar /src/hft.jar -H:Name=/src/hft
 
 FROM debian:bookworm-slim
-COPY --from=base /src/hft /src/hft
+COPY --from=graalvm /src/hft /src/hft
 CMD ["/src/hft", "-d"]

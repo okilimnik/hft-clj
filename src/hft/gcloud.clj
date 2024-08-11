@@ -15,4 +15,8 @@
 
 (defn upload-file! [filepath folder filename]
   (when-not @token (init!))
-  (storage/upload! (str "order_book_08_08_2024/" folder "/" filename) filepath (get-mime-type filename) @token))
+  (try
+    (storage/upload! (str "order_book_11_08_2024/" folder "/" filename) filepath (get-mime-type filename) @token)
+    (catch Exception _
+      (init!)
+      (upload-file! filepath folder filename))))
