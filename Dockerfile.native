@@ -9,5 +9,5 @@ COPY --from=lein /src/target/hft.jar ./
 RUN native-image -Djava.awt.headless=false --report-unsupported-elements-at-runtime --features=clj_easy.graal_build_time.InitClojureClasses --no-fallback --no-server --enable-url-protocols=https -jar /src/hft.jar -H:Name=/src/hft
 
 FROM debian:bookworm-slim
-COPY --from=graalvm /src/hft /src/hft
+COPY --from=graalvm /src/ /src/
 CMD ["/src/hft", "-d"]

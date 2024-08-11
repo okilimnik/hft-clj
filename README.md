@@ -7,3 +7,7 @@ for MacOS you may need to invoke:
 ## Key Points
 The bid price is the highest price a buyer is willing to pay for a security.
 The ask price is the lowest price a seller is willing to accept for a security.
+
+
+## Docker
+asia-northeast1-docker.pkg.dev/neusa-a919b/neusa/neusa-hft:latest
