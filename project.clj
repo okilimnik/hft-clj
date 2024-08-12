@@ -15,4 +15,7 @@
                  [com.phronemophobic/membrane "0.14.4-beta"]]
   :main hft.core
   :uberjar-name "hft.jar"
-  :profiles {:uberjar {:aot :all}})
+  :profiles {:uberjar {:aot :all
+                       :jvm-opts ["-Dtech.v3.datatype.graal-native=true"
+                                  "-Dclojure.compiler.direct-linking=true"
+                                  "-Dclojure.spec.skip-macros=true"]}})
