@@ -1,12 +1,12 @@
 (ns hft.data
   (:require [clojure.java.io :as io]
-            [clojure.math :refer [ceil]]
-            [hft.image :as i]
+            ;[clojure.math :refer [ceil]]
+            ;[hft.image :as i]
             [hft.gcloud :refer [upload-file!]])
-  (:import [java.awt Color]
+  #_(:import [java.awt Color]
            [org.imgscalr Scalr Scalr$Rotation]))
 
-(defn ->image
+#_(defn ->image
   "int[] pixels - 1-dimensional Java array, which length is width * height"
   [{:keys [data max-value min-value] :or {min-value 0}}]
   (let [width (count data)
@@ -35,7 +35,8 @@
           image-filepath (str dir "/" image-filename)
           metadata-filename (str timestamp ".edn")
           metadata-filepath (str dir "/" metadata-filename)]
-      (i/save image image-filepath)
+      #_(i/save image image-filepath)
+      (spit image-filepath image)
       (when metadata
         (spit metadata-filepath metadata))
       (when-not ui?

@@ -56,7 +56,7 @@
      :max-ask-distance (get-distance-from-terminator asks 10)}))
 
 (defn save-order-books [market inputs ui? on-update]
-  (let [image (du/->image {:data inputs
+  (let [image (with-out-str (pprint inputs)) #_(du/->image {:data inputs
                            :max-value (get MAX-QUANTITY market)})
         label ""
         filepath  (when (or ui? (let [{:keys [max-bid-distance max-ask-distance]} (last inputs)]
