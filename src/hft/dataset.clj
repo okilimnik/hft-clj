@@ -57,29 +57,29 @@
 
 (defn save-order-books [market inputs ui? on-update]
   (let [image (with-out-str (pprint inputs)) #_(du/->image {:data inputs
-                           :max-value (get MAX-QUANTITY market)})
+                                                            :max-value (get MAX-QUANTITY market)})
         label ""
-        filepath  (when (or ui? (let [{:keys [max-bid-distance max-ask-distance]} (last inputs)]
+        filepath  #_(when (or ui? (let [{:keys [max-bid-distance max-ask-distance]} (last inputs)]
                                   (or (> max-bid-distance 2)
-                                      (> max-ask-distance 2))))
-                    (du/save-image {:image image
-                                    :metadata (with-out-str
-                                                (pprint
-                                                 {:ask-levels-with-max-qty (mapv :ask-levels-with-max-qty inputs)
-                                                  :max-ask-distance (mapv :max-ask-distance inputs)
-                                                  :bid-levels-with-max-qty (mapv :bid-levels-with-max-qty inputs)
-                                                  :max-bid-distance (mapv :max-bid-distance inputs)}))
-                                    :dataset-dir "./dataset"
-                                    :folder (name market)
-                                    :filename label
-                                    :ui? ui?}))]
+                                      (> max-ask-distance 2)))))
+        (du/save-image {:image image
+                        :metadata (with-out-str
+                                    (pprint
+                                     {:ask-levels-with-max-qty (mapv :ask-levels-with-max-qty inputs)
+                                      :max-ask-distance (mapv :max-ask-distance inputs)
+                                      :bid-levels-with-max-qty (mapv :bid-levels-with-max-qty inputs)
+                                      :max-bid-distance (mapv :max-bid-distance inputs)}))
+                        :dataset-dir "./dataset"
+                        :folder (name market)
+                        :filename label
+                        :ui? ui?})]
     (on-update {:src filepath :label label})))
 
 (defn pipeline-v1 [{:keys [on-update ui? market] :or {on-update (fn [_]) market :binance}}]
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)]
     (scheduler/start!
-     10000
+     3000
      (fn []
        (let [order-book (market/depth! market SYMBOL 5000)]
          (swap! max-bids #(as-> % $
