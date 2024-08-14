@@ -60,8 +60,9 @@
                            :max-value (get MAX-QUANTITY market)})
         label ""
         filepath  (when (or ui? (let [{:keys [max-bid-distance max-ask-distance]} (last inputs)]
-                                  (or (> max-bid-distance 2)
-                                      (> max-ask-distance 2))))
+                                  (and (or (> max-bid-distance 2)
+                                           (> max-ask-distance 2))
+                                       (> (abs (- max-bid-distance max-ask-distance)) 2))))
                     (du/save-image {:image image
                                     :metadata (with-out-str
                                                 (pprint
