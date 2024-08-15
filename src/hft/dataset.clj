@@ -34,12 +34,15 @@
 (defn get-levels-with-max-qty-sorted [prices]
   (->> (map-indexed vector prices)
        (sort-by second >)
-       (map first)
        (take 3)
        vec))
 
-(defn get-distance-from-terminator [prices terminator]
-  (abs (- (first (get-levels-with-max-qty-sorted prices)) terminator)))
+(defn get-distance-from-terminator [levels terminator]
+  (abs (- (ffirst levels) terminator)))
+
+(defn qty-change-ratio [levels terminator]
+  (int (/ (second (nth levels terminator))
+          (second (first levels)))))
 
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
@@ -47,29 +50,39 @@
         max-price (get-max-price mid-price)
         price-interval (- max-price min-price)
         bids (get-image-column min-price max-price price-interval (:bids order-book))
-        asks (get-image-column min-price max-price price-interval (:asks order-book))]
+        asks (get-image-column min-price max-price price-interval (:asks order-book))
+        bid-levels-with-max-qty-sorted (get-levels-with-max-qty-sorted bids)
+        ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)]
     {:bids bids
-     :bid-levels-with-max-qty (get-levels-with-max-qty-sorted bids)
-     :max-bid-distance (get-distance-from-terminator bids 9)
+     :bid-levels-of-max-qty bid-levels-with-max-qty-sorted
+     :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted 9)
+     :bid-qty-change-ratio (qty-change-ratio bid-levels-with-max-qty-sorted 9)
      :asks asks
-     :ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)
-     :max-ask-distance (get-distance-from-terminator asks 10)}))
+     :ask-levels-of-max-qty ask-levels-with-max-qty
+     :max-ask-distance (get-distance-from-terminator ask-levels-with-max-qty 10)
+     :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty 10)}))
 
 (defn save-order-books [market inputs ui? on-update]
   (let [image (with-out-str (pprint inputs)) #_(du/->image {:data inputs
-                           :max-value (get MAX-QUANTITY market)})
+                                                            :max-value (get MAX-QUANTITY market)})
         label ""
-        filepath  (when (or ui? (let [{:keys [max-bid-distance max-ask-distance]} (last inputs)]
-                                  (and (or (> max-bid-distance 2)
-                                           (> max-ask-distance 2))
-                                       (> (abs (- max-bid-distance max-ask-distance)) 2))))
+        filepath  (when (or ui? (let [{:keys [max-bid-distance max-ask-distance bid-qty-change-ratio ask-qty-change-ratio]} (last inputs)
+                                      bid-signal? (and (> max-bid-distance 2)
+                                                       (> bid-qty-change-ratio 2))
+                                      ask-signal? (and (> max-ask-distance 2)
+                                                       (> ask-qty-change-ratio 2))]
+                                  (if (and bid-signal? ask-signal?)
+                                    (> (abs (- max-bid-distance max-ask-distance)) 2)
+                                    (or bid-signal? ask-signal?))))
                     (du/save-image {:image image
                                     :metadata (with-out-str
                                                 (pprint
-                                                 {:ask-levels-with-max-qty (mapv :ask-levels-with-max-qty inputs)
+                                                 {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
                                                   :max-ask-distance (mapv :max-ask-distance inputs)
-                                                  :bid-levels-with-max-qty (mapv :bid-levels-with-max-qty inputs)
-                                                  :max-bid-distance (mapv :max-bid-distance inputs)}))
+                                                  :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
+                                                  :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
+                                                  :max-bid-distance (mapv :max-bid-distance inputs)
+                                                  :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}))
                                     :dataset-dir "./dataset"
                                     :folder (name market)
                                     :filename label
@@ -99,5 +112,5 @@
 
 (defn prepare! [& markets]
   #_(doseq [market (rest markets)]
-    (thread (pipeline-v1 {:market market})))
+      (thread (pipeline-v1 {:market market})))
   (pipeline-v1 {:market (first markets)}))
