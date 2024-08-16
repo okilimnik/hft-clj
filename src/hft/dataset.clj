@@ -71,6 +71,8 @@
                                                        (> bid-qty-change-ratio 2))
                                       ask-signal? (and (> max-ask-distance 2)
                                                        (> ask-qty-change-ratio 2))]
+                                  (prn "bid-qty-change-ratio: " bid-qty-change-ratio)
+                                  (prn "ask-qty-change-ratio: " ask-qty-change-ratio)
                                   (if (and bid-signal? ask-signal?)
                                     (> (abs (- max-bid-distance max-ask-distance)) 2)
                                     (or bid-signal? ask-signal?))))
