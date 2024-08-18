@@ -42,7 +42,7 @@
 
 (defn qty-change-ratio [levels prices terminator]
   (float (/ (second (first levels))
-            (nth prices terminator))))
+            (+ 0.0001 (nth prices terminator)))))
 
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
