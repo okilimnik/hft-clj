@@ -37,25 +37,20 @@
        (take 3)
        vec))
 
-(defn get-distance-from-terminator [levels terminator]
-  (abs (- (ffirst levels) terminator)))
+(defn get-distance-from-terminator [levels terminator-level]
+  (abs (- (ffirst levels) terminator-level)))
 
-(defn qty-change-ratio [levels prices terminator]
+(defn get-terminator-level-and-qty [prices bids?]
+  (let [f (if bids? dec inc)]
+    (loop [i (if bids? (dec INPUT-SIZE) 0)]
+      (let [qty (nth prices i)]
+        (if (> qty 0)
+          [i qty]
+          (recur (f i)))))))
+
+(defn qty-change-ratio [levels terminator-qty]
   (float (/ (second (first levels))
-            (let [result (nth prices terminator)]
-              (if (> result 0)
-                result
-                (if (= 9 terminator)
-                  (let [result (nth prices 10)]
-                    (if (> result 0)
-                      result
-                      (let [result (nth prices 8)]
-                        result)))
-                  (let [result (nth prices 9)]
-                    (if (> result 0)
-                      result
-                      (let [result (nth prices 11)]
-                        result)))))))))
+            terminator-qty)))
 
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
@@ -65,15 +60,17 @@
         bids (get-image-column min-price max-price price-interval (:bids order-book))
         asks (get-image-column min-price max-price price-interval (:asks order-book))
         bid-levels-with-max-qty-sorted (get-levels-with-max-qty-sorted bids)
-        ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)]
+        ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)
+        [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty asks false)
+        [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty bids true)]
     {:bids bids
      :bid-levels-of-max-qty bid-levels-with-max-qty-sorted
-     :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted 9)
-     :bid-qty-change-ratio (qty-change-ratio bid-levels-with-max-qty-sorted bids 9)
+     :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted bids-terminator-level)
+     :bid-qty-change-ratio (qty-change-ratio bid-levels-with-max-qty-sorted bids-terminator-qty)
      :asks asks
      :ask-levels-of-max-qty ask-levels-with-max-qty
-     :max-ask-distance (get-distance-from-terminator ask-levels-with-max-qty 10)
-     :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks 10)}))
+     :max-ask-distance (get-distance-from-terminator ask-levels-with-max-qty asks-terminator-level)
+     :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)}))
 
 (defn save-order-books [market inputs ui? on-update]
   (let [image (with-out-str (pprint inputs)) #_(du/->image {:data inputs
