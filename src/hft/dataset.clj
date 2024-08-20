@@ -8,6 +8,7 @@
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
 (def MAX-QUANTITY {:binance 100 :kraken 20})
+(def MIN-QUANTITY {:binance 10 :kraken 5})
 (def PRICE-INTERVAL-FOR-INDEXING 100)
 
 (def keep-running? (atom true))
@@ -40,11 +41,11 @@
 (defn get-distance-from-terminator [levels terminator-level]
   (abs (- (ffirst levels) terminator-level)))
 
-(defn get-terminator-level-and-qty [prices bids?]
+(defn get-terminator-level-and-qty [market prices bids?]
   (let [f (if bids? dec inc)]
     (loop [i (if bids? (dec INPUT-SIZE) 0)]
       (let [qty (nth prices i)]
-        (if (> qty 0)
+        (if (> qty (get MIN-QUANTITY market))
           [i qty]
           (recur (f i)))))))
 
@@ -52,7 +53,7 @@
   (float (/ (second (first levels))
             terminator-qty)))
 
-(defn order-book->quantities-indexed-by-price-level [order-book max-bid]
+(defn order-book->quantities-indexed-by-price-level [market order-book max-bid]
   (let [mid-price max-bid
         min-price (get-min-price mid-price)
         max-price (get-max-price mid-price)
@@ -61,8 +62,8 @@
         asks (get-image-column min-price max-price price-interval (:asks order-book))
         bid-levels-with-max-qty-sorted (get-levels-with-max-qty-sorted bids)
         ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)
-        [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty asks false)
-        [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty bids true)]
+        [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty market asks false)
+        [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty market bids true)]
     {:bids bids
      :bid-levels-of-max-qty bid-levels-with-max-qty-sorted
      :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted bids-terminator-level)
@@ -83,44 +84,7 @@
         :max-bid-distance (mapv :max-bid-distance inputs)
         :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}))))
 
-#_(defn save-order-books [market inputs ui? on-update]
-  (let [{:keys [max-bid-distance max-ask-distance bid-qty-change-ratio ask-qty-change-ratio]} (last inputs)
-
-        #_image #_(with-out-str (pprint inputs)) #_(du/->image {:data inputs
-                                                                :max-value (get MAX-QUANTITY market)})
-       ; label ""
-        #_filepath  #_(when (or ui? (let [bid-signal? (and (> max-bid-distance 2)
-                                                           (> bid-qty-change-ratio 2))
-                                          ask-signal? (and (> max-ask-distance 2)
-                                                           (> ask-qty-change-ratio 2))]
-
-                                      #_(if (and bid-signal? ask-signal?)
-                                          (> (abs (- max-bid-distance max-ask-distance)) 2)
-                                          (or bid-signal? ask-signal?))))
-                        #_(du/save-image {:image image
-                                          :metadata (with-out-str
-                                                      (pprint
-                                                       {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
-                                                        :max-ask-distance (mapv :max-ask-distance inputs)
-                                                        :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
-                                                        :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
-                                                        :max-bid-distance (mapv :max-bid-distance inputs)
-                                                        :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}))
-                                          :dataset-dir "./dataset"
-                                          :folder (name market)
-                                          :filename label
-                                          :ui? ui?}))]
-    (when (or (> max-bid-distance 2) (> max-ask-distance 2))
-      (pprint
-       {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
-        :max-ask-distance (mapv :max-ask-distance inputs)
-        :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
-        :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
-        :max-bid-distance (mapv :max-bid-distance inputs)
-        :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}))
-    #_(on-update {:src filepath :label label})))
-
-(defn pipeline-v1 [{:keys [on-update ui? market] :or {on-update (fn [_]) market :binance}}]
+(defn pipeline-v1 [{:keys [market] :or {market :binance}}]
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)]
     (scheduler/start!
@@ -133,13 +97,12 @@
                               (pop $)
                               $)))
          (swap! inputs #(as-> % $
-                          (conj $ (order-book->quantities-indexed-by-price-level order-book (apply max @max-bids)))
+                          (conj $ (order-book->quantities-indexed-by-price-level market order-book (apply max @max-bids)))
                           (if (> (count $) INPUT-SIZE)
                             (pop $)
                             $)))
          (when (= (count @inputs) INPUT-SIZE)
-           (print-analysis! @inputs)
-           #_(save-order-books market @inputs ui? on-update))))
+           (print-analysis! @inputs))))
      keep-running?)))
 
 (defn prepare! [& markets]
