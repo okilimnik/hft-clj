@@ -4,6 +4,6 @@ COPY . /src
 RUN lein do clean, uberjar
 
 FROM container-registry.oracle.com/graalvm/jdk:22
-WORKDIR /src
 COPY --from=lein /src/target/hft.jar ./
-CMD ["java", "-jar", "/src/hft.jar"] 
+COPY --from=lein /src/binance.config.edn ./
+CMD ["java", "-jar", "hft.jar"] 

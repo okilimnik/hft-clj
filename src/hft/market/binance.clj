@@ -1,14 +1,39 @@
 (ns hft.market.binance
   (:require [jsonista.core :as j]
-            [clj-http.lite.client :as http]))
+            [clojure.edn :as edn])
+  (:import [com.binance.connector.client.impl SpotClientImpl]))
 
-(def url "https://api4.binance.com")
+(def trade-client (atom nil))
+(def market-client (atom nil))
+
+(defn init []
+  (let [config (:prod (edn/read-string (slurp "binance.config.edn")))]
+    (reset! trade-client (.createTrade (SpotClientImpl. (:apiKey config) (:secret config) (:url config))))
+    (reset! market-client (.createMarket (SpotClientImpl. (:url config))))))
 
 (defn jread [v]
   (j/read-value v j/keyword-keys-object-mapper))
 
+(defn open-order! [params]
+  (when-not @market-client (init))
+  (jread (.newOrder @trade-client params)))
+
+(defn opened-orders! [symbol]
+  (when-not @market-client (init))
+  (jread (.getOpenOrders @trade-client {"symbol" symbol
+                                        "timestamp" (System/currentTimeMillis)})))
+
+(defn cancel-order! [symbol id]
+  (when-not @market-client (init))
+  (-> (.cancelOrder @trade-client {"symbol" symbol
+                                   "orderId" id
+                                   "timestamp" (System/currentTimeMillis)})
+      jread))
+
 (defn depth! [symbol limit]
-  ;(prn "requesting binance data")
-  (jread (:body (http/get (str url "/api/v3/depth") {:accept :json
-                                                     :query-params {"symbol" symbol
-                                                                    "limit" limit}}))))
+  (when-not @market-client (init))
+  (jread (.depth @market-client {"symbol" symbol "limit" limit})))
+
+(defn best-price! [symbol]
+  (when-not @market-client (init))
+  (jread (.bookTicker @market-client {"symbol" symbol})))

@@ -72,17 +72,17 @@
      :max-ask-distance (get-distance-from-terminator ask-levels-with-max-qty asks-terminator-level)
      :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)}))
 
-(defn print-analysis! [inputs]
+(defn analyze [inputs]
   (let [{:keys [max-bid-distance max-ask-distance]} (last inputs)
-        analysis {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
-                  :max-ask-distance (mapv :max-ask-distance inputs)
-                  :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
-                  :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
-                  :max-bid-distance (mapv :max-bid-distance inputs)
-                  :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}]
-    (when (or (> max-bid-distance 2) (> max-ask-distance 2))
+        data {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
+              :max-ask-distance (mapv :max-ask-distance inputs)
+              :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
+              :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
+              :max-bid-distance (mapv :max-bid-distance inputs)
+              :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}])
+  #_(when (or (> max-bid-distance 2) (> max-ask-distance 2))
       (pprint analysis))
-    (trade! analysis)))
+  :wait)
 
 (defn pipeline-v1 [{:keys [market] :or {market :binance}}]
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
@@ -102,5 +102,7 @@
                             (pop $)
                             $)))
          (when (= (count @inputs) INPUT-SIZE)
-           (print-analysis! @inputs))))
+           (->> @inputs
+                analyze
+                (trade! SYMBOL)))))
      keep-running?)))
