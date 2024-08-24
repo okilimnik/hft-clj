@@ -83,12 +83,15 @@
   :wait)
 
 (defn upload-buy-alert-data! [start end]
-  (for [f (file-seq (io/file DATA-FOLDER))
-        :let [file-time (parse-long (.getFileName f))]
-        :when (and (.isFile f)
-                   (> end file-time start))]
-    (do (gcloud/upload-file! f)
-        (io/delete-file f))))
+  (doall
+   (for [f (file-seq (io/file DATA-FOLDER))
+         :let [file-time (parse-long (.getFileName f))]
+         :when (and (.isFile f)
+                    (> end file-time start))]
+     (gcloud/upload-file! f)))
+  (doseq [f (file-seq (io/file DATA-FOLDER))
+          :when (.isFile f)]
+    (io/delete-file f)))
 
 (defn pipeline-v1 []
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
