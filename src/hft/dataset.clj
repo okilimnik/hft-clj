@@ -78,7 +78,9 @@
               :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
               :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
               :max-bid-distance (mapv :max-bid-distance inputs)
-              :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}]
+              :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}
+        data-folder (io/file DATA-FOLDER)]
+    (.mkdir data-folder)
     (spit (str DATA-FOLDER "/" (System/currentTimeMillis)) (with-out-str (pprint data))))
   :wait)
 
