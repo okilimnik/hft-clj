@@ -87,7 +87,7 @@
 (defn upload-buy-alert-data! [start end]
   (doall
    (for [f (file-seq (io/file DATA-FOLDER))
-         :let [file-time (parse-long (.getFileName f))]
+         :let [file-time (parse-long (.getName f))]
          :when (and (.isFile f)
                     (> end file-time start))]
      (gcloud/upload-file! f)))
