@@ -8,8 +8,10 @@
 
 (defn init []
   (let [config (:prod (edn/read-string (slurp "binance.config.edn")))]
-    (reset! trade-client (.createTrade (SpotClientImpl. (:apiKey config) (:secret config) (:url config))))
-    (reset! market-client (.createMarket (SpotClientImpl. (:url config))))))
+    (reset! trade-client (.createTrade (SpotClientImpl. (System/getenv "BINANCE_API_KEY")
+                                                        (System/getenv "BINANCE_SECRET")
+                                                        (System/getenv "BINANCE_URL"))))
+    (reset! market-client (.createMarket (SpotClientImpl. (System/getenv "BINANCE_URL"))))))
 
 (defn jread [v]
   (j/read-value v j/keyword-keys-object-mapper))
