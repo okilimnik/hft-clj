@@ -64,10 +64,12 @@
         [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty asks false)
         [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty bids true)]
     {:bids bids
+     :bids-terminator-level-and-qty [bids-terminator-level bids-terminator-qty]
      :bid-levels-of-max-qty bid-levels-with-max-qty-sorted
      :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted bids-terminator-level)
      :bid-qty-change-ratio (qty-change-ratio bid-levels-with-max-qty-sorted bids-terminator-qty)
      :asks asks
+     :asks-terminator-level-and-qty [asks-terminator-level asks-terminator-qty]
      :ask-levels-of-max-qty ask-levels-with-max-qty
      :max-ask-distance (get-distance-from-terminator ask-levels-with-max-qty asks-terminator-level)
      :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)}))
@@ -76,9 +78,11 @@
   (let [data {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
               :max-ask-distance (mapv :max-ask-distance inputs)
               :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
+              :asks-terminator-level-and-qty (mapv :asks-terminator-level-and-qty inputs)
               :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
               :max-bid-distance (mapv :max-bid-distance inputs)
-              :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}
+              :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)
+              :bids-terminator-level-and-qty (mapv :bids-terminator-level-and-qty inputs)}
         data-folder (io/file DATA-FOLDER)]
     (.mkdir data-folder)
     (spit (str DATA-FOLDER "/" (System/currentTimeMillis)) (with-out-str (pprint data))))
