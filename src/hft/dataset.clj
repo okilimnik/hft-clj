@@ -1,16 +1,16 @@
 (ns hft.dataset
-  (:require [clojure.pprint :refer [pprint]]
-            [hft.market :as market]
-            [hft.scheduler :as scheduler]
-            [hft.trade :refer [trade!]]))
+  (:require [clojure.core.async :as a :refer [<!!]]
+            [clojure.java.io :as io]
+            [clojure.pprint :refer [pprint]]
+            [hft.gcloud :as gcloud]
+            [hft.market.binance :as bi]
+            [hft.scheduler :as scheduler]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
-(def MAX-QUANTITY {:binance 100 :kraken 20})
-(def MIN-QUANTITY {:binance 10 :kraken 5})
+(def MIN-QUANTITY 10)
 (def PRICE-INTERVAL-FOR-INDEXING 100)
-
-(def keep-running? (atom true))
+(def DATA-FOLDER "./dataset")
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -40,11 +40,11 @@
 (defn get-distance-from-terminator [levels terminator-level]
   (abs (- (ffirst levels) terminator-level)))
 
-(defn get-terminator-level-and-qty [market prices bids?]
+(defn get-terminator-level-and-qty [prices bids?]
   (let [f (if bids? dec inc)]
     (loop [i (if bids? (dec INPUT-SIZE) 0)]
       (let [qty (nth prices i)]
-        (if (> qty (get MIN-QUANTITY market))
+        (if (> qty MIN-QUANTITY)
           [i qty]
           (recur (f i)))))))
 
@@ -52,7 +52,7 @@
   (float (/ (second (first levels))
             terminator-qty)))
 
-(defn order-book->quantities-indexed-by-price-level [market order-book max-bid]
+(defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
         min-price (get-min-price mid-price)
         max-price (get-max-price mid-price)
@@ -61,8 +61,8 @@
         asks (get-image-column min-price max-price price-interval (:asks order-book))
         bid-levels-with-max-qty-sorted (get-levels-with-max-qty-sorted bids)
         ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)
-        [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty market asks false)
-        [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty market bids true)]
+        [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty asks false)
+        [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty bids true)]
     {:bids bids
      :bid-levels-of-max-qty bid-levels-with-max-qty-sorted
      :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted bids-terminator-level)
@@ -73,36 +73,51 @@
      :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)}))
 
 (defn analyze [inputs]
-  (let [{:keys [max-bid-distance max-ask-distance]} (last inputs)
-        data {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
+  (let [data {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
               :max-ask-distance (mapv :max-ask-distance inputs)
               :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
               :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
               :max-bid-distance (mapv :max-bid-distance inputs)
-              :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}])
-  #_(when (or (> max-bid-distance 2) (> max-ask-distance 2))
-      (pprint analysis))
+              :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)}]
+    (spit (str DATA-FOLDER "/" (System/currentTimeMillis)) (with-out-str (pprint data))))
   :wait)
 
-(defn pipeline-v1 [{:keys [market] :or {market :binance}}]
+(defn upload-buy-alert-data! [start end]
+  (for [f (file-seq (io/file DATA-FOLDER))
+        :let [file-time (parse-long (.getFileName f))]
+        :when (and (.isFile f)
+                   (> end file-time start))]
+    (do (gcloud/upload-file! f)
+        (io/delete-file f))))
+
+(defn pipeline-v1 []
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)]
-    (scheduler/start!
-     6000
-     (fn []
-       (let [order-book (market/depth! market SYMBOL 5000)]
-         (swap! max-bids #(as-> % $
-                            (conj $ (parse-double (ffirst (:bids order-book))))
-                            (if (> (count $) INPUT-SIZE)
-                              (pop $)
-                              $)))
-         (swap! inputs #(as-> % $
-                          (conj $ (order-book->quantities-indexed-by-price-level market order-book (apply max @max-bids)))
-                          (if (> (count $) INPUT-SIZE)
-                            (pop $)
-                            $)))
-         (when (= (count @inputs) INPUT-SIZE)
-           (->> @inputs
-                analyze
-                (trade! SYMBOL)))))
-     keep-running?)))
+    (<!!
+     (a/map vector
+            [(scheduler/start!
+              6000
+              (fn []
+                (let [order-book (bi/depth! SYMBOL 5000)]
+                  (swap! max-bids #(as-> % $
+                                     (conj $ (parse-double (ffirst (:bids order-book))))
+                                     (if (> (count $) INPUT-SIZE)
+                                       (pop $)
+                                       $)))
+                  (swap! inputs #(as-> % $
+                                   (conj $ (order-book->quantities-indexed-by-price-level order-book (apply max @max-bids)))
+                                   (if (> (count $) INPUT-SIZE)
+                                     (pop $)
+                                     $)))
+                  (when (= (count @inputs) INPUT-SIZE)
+                    (->> @inputs
+                         analyze
+                         #_(trade! SYMBOL))))))
+             (scheduler/start!
+              (* 5 60000)
+              (fn []
+                (let [price-change (parse-double (:priceChange (bi/mini-ticker! SYMBOL "15m")))
+                      interval-end-time (System/currentTimeMillis)
+                      interval-start-time (- interval-end-time (* 15 60000))]
+                  (when (> price-change 200)
+                    (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))

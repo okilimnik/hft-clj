@@ -34,6 +34,6 @@
   (when-not @market-client (init))
   (jread (.depth @market-client {"symbol" symbol "limit" limit})))
 
-(defn best-price! [symbol]
+(defn mini-ticker! [symbol window]
   (when-not @market-client (init))
-  (jread (.bookTicker @market-client {"symbol" symbol})))
+  (jread (.ticker @market-client {"symbol" symbol "windowSize" window "type" "FULL"})))
