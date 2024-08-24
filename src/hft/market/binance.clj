@@ -1,17 +1,15 @@
 (ns hft.market.binance
-  (:require [jsonista.core :as j]
-            [clojure.edn :as edn])
+  (:require [jsonista.core :as j])
   (:import [com.binance.connector.client.impl SpotClientImpl]))
 
 (def trade-client (atom nil))
 (def market-client (atom nil))
 
 (defn init []
-  (let [config (:prod (edn/read-string (slurp "binance.config.edn")))]
-    (reset! trade-client (.createTrade (SpotClientImpl. (System/getenv "BINANCE_API_KEY")
-                                                        (System/getenv "BINANCE_SECRET")
-                                                        (System/getenv "BINANCE_URL"))))
-    (reset! market-client (.createMarket (SpotClientImpl. (System/getenv "BINANCE_URL"))))))
+  (reset! trade-client (.createTrade (SpotClientImpl. (System/getenv "BINANCE_API_KEY")
+                                                      (System/getenv "BINANCE_SECRET")
+                                                      (System/getenv "BINANCE_URL"))))
+  (reset! market-client (.createMarket (SpotClientImpl. (System/getenv "BINANCE_URL")))))
 
 (defn jread [v]
   (j/read-value v j/keyword-keys-object-mapper))
