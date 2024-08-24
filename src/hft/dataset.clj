@@ -94,30 +94,30 @@
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)]
     (<!!
-     (a/map vector
-            [(scheduler/start!
-              6000
-              (fn []
-                (let [order-book (bi/depth! SYMBOL 5000)]
-                  (swap! max-bids #(as-> % $
-                                     (conj $ (parse-double (ffirst (:bids order-book))))
-                                     (if (> (count $) INPUT-SIZE)
-                                       (pop $)
-                                       $)))
-                  (swap! inputs #(as-> % $
-                                   (conj $ (order-book->quantities-indexed-by-price-level order-book (apply max @max-bids)))
-                                   (if (> (count $) INPUT-SIZE)
-                                     (pop $)
-                                     $)))
-                  (when (= (count @inputs) INPUT-SIZE)
-                    (->> @inputs
-                         analyze
-                         #_(trade! SYMBOL))))))
-             (scheduler/start!
-              (* 5 60000)
-              (fn []
-                (let [price-change (parse-double (:priceChange (bi/mini-ticker! SYMBOL "15m")))
-                      interval-end-time (System/currentTimeMillis)
-                      interval-start-time (- interval-end-time (* 15 60000))]
-                  (when (> price-change 200)
-                    (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
+     (a/merge
+      [(scheduler/start!
+        6000
+        (fn []
+          (let [order-book (bi/depth! SYMBOL 5000)]
+            (swap! max-bids #(as-> % $
+                               (conj $ (parse-double (ffirst (:bids order-book))))
+                               (if (> (count $) INPUT-SIZE)
+                                 (pop $)
+                                 $)))
+            (swap! inputs #(as-> % $
+                             (conj $ (order-book->quantities-indexed-by-price-level order-book (apply max @max-bids)))
+                             (if (> (count $) INPUT-SIZE)
+                               (pop $)
+                               $)))
+            (when (= (count @inputs) INPUT-SIZE)
+              (->> @inputs
+                   analyze
+                   #_(trade! SYMBOL))))))
+       (scheduler/start!
+        (* 5 60000)
+        (fn []
+          (let [price-change (parse-double (:priceChange (bi/mini-ticker! SYMBOL "15m")))
+                interval-end-time (System/currentTimeMillis)
+                interval-start-time (- interval-end-time (* 15 60000))]
+            (when (> price-change 200)
+              (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
