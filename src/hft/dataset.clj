@@ -85,7 +85,8 @@
               :bids-terminator-level-and-qty (mapv :bids-terminator-level-and-qty inputs)}
         data-folder (io/file DATA-FOLDER)
         path (str DATA-FOLDER "/" (System/currentTimeMillis))]
-    (when (>= (:ask-qty-change-ratio (last inputs)) 5)
+    (when (and (>= (:ask-qty-change-ratio (last inputs)) 5)
+               (< (:bid-qty-change-ratio (last inputs)) 2))
       (.mkdir data-folder)
       (spit path (with-out-str (pprint data)))
       (gcloud/upload-file! (io/file path))))
