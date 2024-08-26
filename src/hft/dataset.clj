@@ -128,8 +128,9 @@
           (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
                 high-price (parse-double (:highPrice mini-ticker-data))
                 low-price (parse-double (:lowPrice mini-ticker-data))
-                price-change (- high-price low-price)
+                max-price-change (- high-price low-price)
+                price-change (parse-double (:priceChange mini-ticker-data))
                 interval-end-time (System/currentTimeMillis)
                 interval-start-time (- interval-end-time (* 15 60000))]
-            (when (> price-change 200)
+            (when (and (> price-change 0) (> max-price-change 200))
               (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
