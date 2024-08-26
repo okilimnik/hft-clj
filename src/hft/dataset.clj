@@ -83,9 +83,12 @@
               :max-bid-distance (mapv :max-bid-distance inputs)
               :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)
               :bids-terminator-level-and-qty (mapv :bids-terminator-level-and-qty inputs)}
-        data-folder (io/file DATA-FOLDER)]
-    (.mkdir data-folder)
-    (spit (str DATA-FOLDER "/" (System/currentTimeMillis)) (with-out-str (pprint data))))
+        data-folder (io/file DATA-FOLDER)
+        path (str DATA-FOLDER "/" (System/currentTimeMillis))]
+    (when (>= (:ask-qty-change-ratio (last inputs)) 5)
+      (.mkdir data-folder)
+      (spit path (with-out-str (pprint data)))
+      (gcloud/upload-file! (io/file path))))
   :wait)
 
 (defn upload-buy-alert-data! [start end]
@@ -122,7 +125,7 @@
               (->> @inputs
                    analyze
                    #_(trade! SYMBOL))))))
-       (scheduler/start!
+       #_(scheduler/start!
         (* 5 60000)
         (fn []
           (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
