@@ -125,7 +125,10 @@
        (scheduler/start!
         (* 5 60000)
         (fn []
-          (let [price-change (parse-double (:priceChange (bi/mini-ticker! SYMBOL "15m")))
+          (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
+                high-price (parse-double (:highPrice mini-ticker-data))
+                low-price (parse-double (:lowPrice mini-ticker-data))
+                price-change (- high-price low-price)
                 interval-end-time (System/currentTimeMillis)
                 interval-start-time (- interval-end-time (* 15 60000))]
             (when (> price-change 200)

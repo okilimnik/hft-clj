@@ -36,4 +36,4 @@
 
 (defn mini-ticker! [symbol window]
   (when-not @market-client (init))
-  (jread (.ticker @market-client {"symbol" symbol "windowSize" window "type" "FULL"})))
+  (jread (.ticker @market-client {"symbol" symbol "windowSize" window "type" "MINI"})))
