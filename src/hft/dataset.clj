@@ -87,9 +87,11 @@
         path (str DATA-FOLDER "/" (System/currentTimeMillis))]
     (when (and (>= (:ask-qty-change-ratio (last inputs)) 5)
                (< (:bid-qty-change-ratio (last inputs)) 2))
-      (.mkdir data-folder)
-      (spit path (with-out-str (pprint data)))
-      (gcloud/upload-file! (io/file path))))
+      (let [f (io/file path)]
+        (.mkdir data-folder)
+        (spit path (with-out-str (pprint data)))
+        (gcloud/upload-file! f)
+        (io/delete-file f))))
   :wait)
 
 (defn upload-buy-alert-data! [start end]
