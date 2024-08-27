@@ -83,10 +83,13 @@
               :max-bid-distance (mapv :max-bid-distance inputs)
               :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)
               :bids-terminator-level-and-qty (mapv :bids-terminator-level-and-qty inputs)}
+        {:keys [ask-qty-change-ratio bid-qty-change-ratio max-ask-distance max-bid-distance]} (last inputs)
         data-folder (io/file DATA-FOLDER)
         path (str DATA-FOLDER "/" (System/currentTimeMillis))]
-    (when (and (>= (:ask-qty-change-ratio (last inputs)) 5)
-               (< (:bid-qty-change-ratio (last inputs)) 2))
+    (when (and (>= ask-qty-change-ratio 5)
+               (< bid-qty-change-ratio 2)
+               (> max-ask-distance 2)
+               (< max-bid-distance 2))
       (let [f (io/file path)]
         (.mkdir data-folder)
         (spit path (with-out-str (pprint data)))
