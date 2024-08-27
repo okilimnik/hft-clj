@@ -10,7 +10,7 @@
 (defn upload-file! [f]
   (when-not @token (init!))
   (try
-    (storage/upload! (str "order_book_27_08_2024/" (.getName f)) (.getAbsolutePath f) "text/plain" @token)
+    (storage/upload! (str "2708_0953/" (.getName f)) (.getAbsolutePath f) "text/plain" @token)
     (catch Exception _
       (init!)
       (upload-file! f))))
