@@ -90,11 +90,12 @@
                (< bid-qty-change-ratio 2)
                (> max-ask-distance 2)
                (< max-bid-distance 2))
-      (let [f (io/file path)]
-        (.mkdir data-folder)
-        (spit path (with-out-str (pprint data)))
-        (gcloud/upload-file! f)
-        (io/delete-file f))))
+      (prn "buy")
+      #_(let [f (io/file path)]
+          (.mkdir data-folder)
+          (spit path (with-out-str (pprint data)))
+          (gcloud/upload-file! f)
+          (io/delete-file f))))
   :wait)
 
 (defn upload-buy-alert-data! [start end]
