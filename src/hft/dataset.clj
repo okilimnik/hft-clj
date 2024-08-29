@@ -40,6 +40,9 @@
 (defn get-distance-from-terminator [levels terminator-level]
   (abs (- (ffirst levels) terminator-level)))
 
+(defn get-first-distance [levels]
+  (abs (- (ffirst levels) (first (second levels)))))
+
 (defn get-terminator-level-and-qty [prices bids?]
   (let [f (if bids? dec inc)]
     (loop [i (if bids? (dec INPUT-SIZE) 0)]
@@ -47,6 +50,10 @@
         (if (> qty MIN-QUANTITY)
           [i qty]
           (recur (f i)))))))
+
+(defn first-qty-change-ratio [levels]
+  (float (/ (second (first levels))
+            (second (second levels)))))
 
 (defn qty-change-ratio [levels terminator-qty]
   (float (/ (second (first levels))
@@ -63,33 +70,37 @@
         ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)
         [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty asks false)
         [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty bids true)]
-    {:bids bids
+    {;:bids bids
      :bids-terminator-level-and-qty [bids-terminator-level bids-terminator-qty]
      :bid-levels-of-max-qty bid-levels-with-max-qty-sorted
      :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted bids-terminator-level)
+     :bid-first-distance (get-first-distance bid-levels-with-max-qty-sorted)
      :bid-qty-change-ratio (qty-change-ratio bid-levels-with-max-qty-sorted bids-terminator-qty)
-     :asks asks
+     :bid-first-qty-change-ratio (first-qty-change-ratio bid-levels-with-max-qty-sorted)
+     ;:asks asks
      :asks-terminator-level-and-qty [asks-terminator-level asks-terminator-qty]
      :ask-levels-of-max-qty ask-levels-with-max-qty
      :max-ask-distance (get-distance-from-terminator ask-levels-with-max-qty asks-terminator-level)
-     :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)}))
+     :ask-first-distance (get-first-distance ask-levels-with-max-qty)
+     :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)
+     :ask-first-qty-change-ratio (first-qty-change-ratio ask-levels-with-max-qty)}))
 
 (defn analyze [inputs]
-  (let [data {:ask-levels-of-max-qty (mapv :ask-levels-of-max-qty inputs)
-              :max-ask-distance (mapv :max-ask-distance inputs)
-              :ask-qty-change-ratio (mapv :ask-qty-change-ratio inputs)
-              :asks-terminator-level-and-qty (mapv :asks-terminator-level-and-qty inputs)
-              :bid-levels-of-max-qty (mapv :bid-levels-of-max-qty inputs)
-              :max-bid-distance (mapv :max-bid-distance inputs)
-              :bid-qty-change-ratio (mapv :bid-qty-change-ratio inputs)
-              :bids-terminator-level-and-qty (mapv :bids-terminator-level-and-qty inputs)}
-        {:keys [ask-qty-change-ratio bid-qty-change-ratio max-ask-distance max-bid-distance]} (last inputs)
+  (let [data (->> (for [k (keys (first inputs))]
+                    [k (mapv k inputs)])
+                  (into {}))
         data-folder (io/file DATA-FOLDER)
-        path (str DATA-FOLDER "/" (System/currentTimeMillis))]
-    (when (and (>= ask-qty-change-ratio 5)
-               (< bid-qty-change-ratio 2)
-               (> max-ask-distance 2)
-               (< max-bid-distance 2))
+        path (str DATA-FOLDER "/" (System/currentTimeMillis))
+        {:keys [ask-qty-change-ratio ask-first-qty-change-ratio
+                max-ask-distance ask-first-distance
+                bid-qty-change-ratio bid-first-qty-change-ratio
+                max-bid-distance bid-first-distance]} (last inputs)]
+    (when (or (and (> ask-first-qty-change-ratio 3)
+                   (> ask-first-distance 1))
+              (and ;(< ask-first-qty-change-ratio 2)
+               (< ask-first-distance 1)
+               (> ask-qty-change-ratio 3)
+               (> max-ask-distance 1)))
       (let [f (io/file path)]
         (.mkdir data-folder)
         (spit path (with-out-str (pprint data)))
@@ -132,14 +143,14 @@
                    analyze
                    #_(trade! SYMBOL))))))
        #_(scheduler/start!
-        (* 5 60000)
-        (fn []
-          (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
-                high-price (parse-double (:highPrice mini-ticker-data))
-                low-price (parse-double (:lowPrice mini-ticker-data))
-                max-price-change (- high-price low-price)
-                price-change (parse-double (:priceChange mini-ticker-data))
-                interval-end-time (System/currentTimeMillis)
-                interval-start-time (- interval-end-time (* 15 60000))]
-            (when (and (> price-change 0) (> max-price-change 200))
-              (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
+          (* 5 60000)
+          (fn []
+            (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
+                  high-price (parse-double (:highPrice mini-ticker-data))
+                  low-price (parse-double (:lowPrice mini-ticker-data))
+                  max-price-change (- high-price low-price)
+                  price-change (parse-double (:priceChange mini-ticker-data))
+                  interval-end-time (System/currentTimeMillis)
+                  interval-start-time (- interval-end-time (* 15 60000))]
+              (when (and (> price-change 0) (> max-price-change 200))
+                (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
