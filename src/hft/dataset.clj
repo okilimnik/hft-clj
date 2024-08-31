@@ -86,22 +86,34 @@
      :ask-first-qty-change-ratio (first-qty-change-ratio ask-levels-with-max-qty)}))
 
 (defn analyze [inputs]
-  (let [data (->> (for [k (keys (first inputs))]
-                    [k (mapv k inputs)])
+  (let [last-three (reverse (take 3 (reverse inputs)))
+        data (->> (for [k (keys (first last-three))]
+                    [k (mapv k last-three)])
                   (into {}))
         data-folder (io/file DATA-FOLDER)
-        path (str DATA-FOLDER "/" (System/currentTimeMillis))
-        {:keys [ask-qty-change-ratio ask-first-qty-change-ratio
-                max-ask-distance ask-first-distance
-                bid-qty-change-ratio bid-first-qty-change-ratio
-                max-bid-distance bid-first-distance]} (last inputs)]
-    (when (or (and (> ask-first-qty-change-ratio 3)
-                   (> ask-first-distance 1))
-              (and ;(< ask-first-qty-change-ratio 2)
-               (< ask-first-distance 1)
-               (> ask-qty-change-ratio 3)
-               (> max-ask-distance 1)))
-      (let [f (io/file path)]
+        path (str DATA-FOLDER "/" (System/currentTimeMillis))]
+    (cond
+      ;; buy
+      (and (let [[a b c] (:ask-qty-change-ratio last-three)]
+             (< 2 a b c))
+           (let [[a b c] (:ask-first-qty-change-ratio last-three)]
+             (< 2 a b c))
+           (let [[a b c] (:bid-qty-change-ratio last-three)]
+             (and (< a 2) (< b 2) (< c 2)))
+           (let [[a b c] (:bid-first-qty-change-ratio last-three)]
+             (and (< a 2) (< b 2) (< c 2))))
+      (let [f (io/file (str path "_buy"))]
+        (.mkdir data-folder)
+        (spit path (with-out-str (pprint data)))
+        (gcloud/upload-file! f)
+        (io/delete-file f))
+
+      ;;close buy 
+      (and (let [[a b c] (:ask-qty-change-ratio last-three)]
+             (and (< a 2) (< b 2) (< c 2)))
+           (let [[a b c] (:ask-first-qty-change-ratio last-three)]
+             (and (< a 2) (< b 2) (< c 2))))
+      (let [f (io/file (str path "_close"))]
         (.mkdir data-folder)
         (spit path (with-out-str (pprint data)))
         (gcloud/upload-file! f)
