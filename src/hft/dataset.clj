@@ -110,9 +110,9 @@
         (io/delete-file f))
 
       ;;close buy 
-      (and (let [[a b c] (:ask-qty-change-ratio last-three)]
+      (and (let [[a b c] (:ask-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2)))
-           (let [[a b c] (:ask-first-qty-change-ratio last-three)]
+           (let [[a b c] (:ask-first-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2))))
       (let [f (io/file (str path "_close"))]
         (.mkdir data-folder)
