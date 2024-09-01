@@ -92,15 +92,16 @@
                   (into {}))
         data-folder (io/file DATA-FOLDER)
         path (str DATA-FOLDER "/" (System/currentTimeMillis))]
+    ;(prn data)
     (cond
       ;; buy
-      (and (let [[a b c] (:ask-qty-change-ratio last-three)]
+      (and (let [[a b c] (:ask-qty-change-ratio data)]
              (< 2 a b c))
-           (let [[a b c] (:ask-first-qty-change-ratio last-three)]
+           (let [[a b c] (:ask-first-qty-change-ratio data)]
              (< 2 a b c))
-           (let [[a b c] (:bid-qty-change-ratio last-three)]
+           (let [[a b c] (:bid-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2)))
-           (let [[a b c] (:bid-first-qty-change-ratio last-three)]
+           (let [[a b c] (:bid-first-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2))))
       (let [f (io/file (str path "_buy"))]
         (.mkdir data-folder)
