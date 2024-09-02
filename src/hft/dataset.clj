@@ -10,7 +10,7 @@
 (def INPUT-SIZE 20)
 (def MIN-QUANTITY 10)
 (def PRICE-INTERVAL-FOR-INDEXING 100)
-(def DATA-FOLDER "./dataset")
+(def DATA-FOLDER "dataset")
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
