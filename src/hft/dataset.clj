@@ -92,7 +92,6 @@
                   (into {}))
         data-folder (io/file DATA-FOLDER)
         path (str DATA-FOLDER "/" (System/currentTimeMillis))]
-    ;(prn data)
     (cond
       ;; buy
       (and (let [[a b c] (:ask-qty-change-ratio data)]
