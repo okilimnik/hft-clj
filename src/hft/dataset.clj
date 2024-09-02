@@ -90,8 +90,7 @@
         data (->> (for [k (keys (first last-three))]
                     [k (mapv k last-three)])
                   (into {}))
-        data-folder (io/file DATA-FOLDER)
-        path (str DATA-FOLDER "/" (System/currentTimeMillis))]
+        path-template (str DATA-FOLDER "/" (System/currentTimeMillis))]
     (cond
       ;; buy
       (and (let [[a b c] (:ask-qty-change-ratio data)]
@@ -102,8 +101,8 @@
              (and (< a 2) (< b 2) (< c 2)))
            (let [[a b c] (:bid-first-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2))))
-      (let [f (io/file (str path "_buy"))]
-        (.mkdir data-folder)
+      (let [path (str path-template "_buy")
+            f (io/file path)]
         (spit path (with-out-str (pprint data)))
         (gcloud/upload-file! f)
         (io/delete-file f))
@@ -113,8 +112,8 @@
              (and (< a 2) (< b 2) (< c 2)))
            (let [[a b c] (:ask-first-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2))))
-      (let [f (io/file (str path "_close"))]
-        (.mkdir data-folder)
+      (let [path (str path-template "_close")
+            f (io/file path)]
         (spit path (with-out-str (pprint data)))
         (gcloud/upload-file! f)
         (io/delete-file f))))
@@ -131,7 +130,11 @@
           :when (.isFile f)]
     (io/delete-file f)))
 
+(defn- init []
+  (.mkdir (io/file DATA-FOLDER)))
+
 (defn pipeline-v1 []
+  (init)
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)]
     (<!!
