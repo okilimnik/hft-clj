@@ -95,9 +95,9 @@
     (cond
       ;; buy
       (and (let [[a b c] (:ask-qty-change-ratio data)]
-             (< 2 a b c))
+             (and (< 2 a) (< 3 b) (< 4 c)))
            (let [[a b c] (:ask-first-qty-change-ratio data)]
-             (< 2 a b c))
+             (and (< 2 a) (< 3 b) (< 4 c)))
            (let [[a b c] (:bid-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2)))
            (let [[a b c] (:bid-first-qty-change-ratio data)]
