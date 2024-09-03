@@ -11,6 +11,7 @@
 (def MIN-QUANTITY 10)
 (def PRICE-INTERVAL-FOR-INDEXING 100)
 (def DATA-FOLDER "dataset")
+(def opened-order? (atom false))
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -105,10 +106,12 @@
             f (io/file path)]
         (spit path (with-out-str (pprint data)))
         (gcloud/upload-file! f)
-        (io/delete-file f))
+        (io/delete-file f)
+        (reset! opened-order? true))
 
       ;;close buy 
-      (and (let [[a b c] (:ask-qty-change-ratio data)]
+      (and @opened-order?
+           (let [[a b c] (:ask-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2)))
            (let [[a b c] (:ask-first-qty-change-ratio data)]
              (and (< a 2) (< b 2) (< c 2))))
@@ -116,7 +119,8 @@
             f (io/file path)]
         (spit path (with-out-str (pprint data)))
         (gcloud/upload-file! f)
-        (io/delete-file f))))
+        (io/delete-file f)
+        (reset! opened-order? false))))
   :wait)
 
 (defn upload-buy-alert-data! [start end]
