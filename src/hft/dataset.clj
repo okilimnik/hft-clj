@@ -71,14 +71,14 @@
         ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)
         [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty asks false)
         [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty bids true)]
-    {;:bids bids
+    {:bids bids
      :bids-terminator-level-and-qty [bids-terminator-level bids-terminator-qty]
      :bid-levels-of-max-qty bid-levels-with-max-qty-sorted
      :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted bids-terminator-level)
      :bid-first-distance (get-first-distance bid-levels-with-max-qty-sorted)
      :bid-qty-change-ratio (qty-change-ratio bid-levels-with-max-qty-sorted bids-terminator-qty)
      :bid-first-qty-change-ratio (first-qty-change-ratio bid-levels-with-max-qty-sorted)
-     ;:asks asks
+     :asks asks
      :asks-terminator-level-and-qty [asks-terminator-level asks-terminator-qty]
      :ask-levels-of-max-qty ask-levels-with-max-qty
      :max-ask-distance (get-distance-from-terminator ask-levels-with-max-qty asks-terminator-level)
@@ -86,42 +86,12 @@
      :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)
      :ask-first-qty-change-ratio (first-qty-change-ratio ask-levels-with-max-qty)}))
 
-(defn analyze [inputs]
-  (let [last-three (reverse (take 3 (reverse inputs)))
-        data (->> (for [k (keys (first last-three))]
-                    [k (mapv k last-three)])
+(defn save! [inputs]
+  (let [data (->> (for [k (keys (first inputs))]
+                    [k (mapv k inputs)])
                   (into {}))
-        path-template (str DATA-FOLDER "/" (System/currentTimeMillis))]
-    (cond
-      ;; buy
-      (and (let [[a b c] (:ask-qty-change-ratio data)]
-             (< 3 a (- b 1) (- c 2)))
-           (let [[a b c] (:ask-first-qty-change-ratio data)]
-             (< 3 a (- b 1) (- c 2)))
-           (let [[a b c] (:bid-qty-change-ratio data)]
-             (and (< a 2) (< b 2) (< c 2)))
-           (let [[a b c] (:bid-first-qty-change-ratio data)]
-             (and (< a 2) (< b 2) (< c 2))))
-      (let [path (str path-template "_buy")
-            f (io/file path)]
-        (spit path (with-out-str (pprint data)))
-        (gcloud/upload-file! f)
-        (io/delete-file f)
-        (reset! opened-order? true))
-
-      ;;close buy 
-      (and @opened-order?
-           (let [[a b c] (:ask-qty-change-ratio data)]
-             (and (< a 2) (< b 2) (< c 2)))
-           (let [[a b c] (:ask-first-qty-change-ratio data)]
-             (and (< a 2) (< b 2) (< c 2))))
-      (let [path (str path-template "_close")
-            f (io/file path)]
-        (spit path (with-out-str (pprint data)))
-        (gcloud/upload-file! f)
-        (io/delete-file f)
-        (reset! opened-order? false))))
-  :wait)
+        path (str DATA-FOLDER "/" (System/currentTimeMillis))]
+    (spit path (with-out-str (pprint data)))))
 
 (defn upload-buy-alert-data! [start end]
   (doall
@@ -159,17 +129,16 @@
                                $)))
             (when (= (count @inputs) INPUT-SIZE)
               (->> @inputs
-                   analyze
-                   #_(trade! SYMBOL))))))
-       #_(scheduler/start!
-          (* 5 60000)
-          (fn []
-            (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
-                  high-price (parse-double (:highPrice mini-ticker-data))
-                  low-price (parse-double (:lowPrice mini-ticker-data))
-                  max-price-change (- high-price low-price)
-                  price-change (parse-double (:priceChange mini-ticker-data))
-                  interval-end-time (System/currentTimeMillis)
-                  interval-start-time (- interval-end-time (* 15 60000))]
-              (when (and (> price-change 0) (> max-price-change 200))
-                (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
+                   save!)))))
+       (scheduler/start!
+        (* 5 60000)
+        (fn []
+          (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
+                high-price (parse-double (:highPrice mini-ticker-data))
+                low-price (parse-double (:lowPrice mini-ticker-data))
+                max-price-change (- high-price low-price)
+                price-change (parse-double (:priceChange mini-ticker-data))
+                interval-end-time (System/currentTimeMillis)
+                interval-start-time (- interval-end-time (* 15 60000))]
+            (when (and (> price-change 0) (> max-price-change 200))
+              (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
