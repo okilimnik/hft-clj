@@ -10,3 +10,4 @@ pom.xml
 /.idea
 *.iml
 .DS_Store
+Dockerfile

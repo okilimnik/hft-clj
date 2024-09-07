@@ -1,8 +1,39 @@
 FROM clojure AS lein
+
+ENV \
+    DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        build-essential \
+        gcc \
+        g++ \
+        git \
+        libomp-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -L -o cmake.sh https://github.com/Kitware/CMake/releases/download/v3.29.2/cmake-3.29.2-linux-x86_64.sh && \
+    chmod +x cmake.sh && \
+    sh ./cmake.sh --prefix=/usr/local --skip-license && \
+    rm cmake.sh
+
+RUN git clone \
+        --recursive \
+        --branch stable \
+        --depth 1 \
+        https://github.com/Microsoft/LightGBM && \
+    cd ./LightGBM && \
+    cmake -B build -S . && \
+    cmake --build build -j4 && \
+    cmake --install build && \
+    cd "${HOME}" && \
+    rm -rf LightGBM
+
 WORKDIR /src
 COPY . /src
 RUN lein do clean, uberjar
-
-FROM container-registry.oracle.com/graalvm/jdk:22
-COPY --from=lein /src/target/hft.jar ./
-CMD ["java", "-jar", "hft.jar"] 
+CMD ["java", "-jar", "target/hft.jar"]
