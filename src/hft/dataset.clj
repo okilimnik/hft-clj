@@ -2,9 +2,15 @@
   (:require [clojure.core.async :as a :refer [<!!]]
             [clojure.java.io :as io]
             [clojure.pprint :refer [pprint]]
+            [clojure.string :as str]
+            [hft.async :refer [vthread]]
             [hft.gcloud :as gcloud]
             [hft.market.binance :as bi]
-            [hft.scheduler :as scheduler]))
+            [hft.scheduler :as scheduler]) 
+  (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
+           [java.time Instant ZoneId ZonedDateTime]
+           [org.ta4j.core BarSeries BaseBarSeries]
+           [org.ta4j.core.indicators ParabolicSarIndicator]))
 
 (def SYMBOL "BTCUSDT")
 (def INPUT-SIZE 20)
@@ -60,6 +66,12 @@
   (float (/ (second (first levels))
             terminator-qty)))
 
+#_(defn ->svm [data]
+  (for [row data
+        :let [label (:label row)
+              input (:input row)]]
+    #_(str label " " (str/join " " (map-indexed vector input)))))
+
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
         min-price (get-min-price mid-price)
@@ -110,10 +122,11 @@
 (defn pipeline-v1 []
   (init)
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
-        max-bids (atom clojure.lang.PersistentQueue/EMPTY)]
+        max-bids (atom clojure.lang.PersistentQueue/EMPTY)
+        klines (atom clojure.lang.PersistentQueue/EMPTY)]
     (<!!
      (a/merge
-      [(scheduler/start!
+      [#_(scheduler/start!
         6000
         (fn []
           (let [order-book (bi/depth! SYMBOL 5000)]
@@ -130,15 +143,57 @@
             (when (= (count @inputs) INPUT-SIZE)
               (->> @inputs
                    save!)))))
-       (scheduler/start!
-        (* 5 60000)
-        (fn []
-          (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
-                high-price (parse-double (:highPrice mini-ticker-data))
-                low-price (parse-double (:lowPrice mini-ticker-data))
-                max-price-change (- high-price low-price)
-                price-change (parse-double (:priceChange mini-ticker-data))
-                interval-end-time (System/currentTimeMillis)
-                interval-start-time (- interval-end-time (* 15 60000))]
-            (when (and (> price-change 0) (> max-price-change 200))
-              (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
+       (vthread
+        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1s")
+              series-length 50]
+          (bi/subscribe [klines-1m]
+                        (reify WebSocketMessageCallback
+                          ^void (onMessage [_ event-str]
+                                  (try
+                                    (let [event (bi/jread event-str)
+                                          data (:k (:data event))
+                                          kline-closed? (:x data)]
+                                      (cond
+                                        (and (= klines-1m (:stream event))
+                                             kline-closed?)
+                                        (do (swap! klines #(as-> % $
+                                                             (conj $ (-> data
+                                                                         (select-keys [:t :o :h :l :c :v :n])
+                                                                         (update :o parse-double)
+                                                                         (update :h parse-double)
+                                                                         (update :l parse-double)
+                                                                         (update :c parse-double)
+                                                                         (update :v parse-double)))
+                                                             (if (> (count $) series-length)
+                                                               (pop $)
+                                                               $)))
+                                            (prn "added kline " (count @klines))
+                                            (when (>= (count @klines) series-length)
+                                              (let [series (BaseBarSeries. "1m")]
+                                                (doseq [{:keys [o h l c t v n]} @klines]
+                                                  (let [date (ZonedDateTime/ofInstant
+                                                              (Instant/ofEpochSecond t)
+                                                              (ZoneId/systemDefault))]
+                                                    (.addBar ^BarSeries series date o h l c v n)))
+                                                (let [psar (ParabolicSarIndicator. series)
+                                                      prev-value (.doubleValue (.getValue psar (- series-length 2)))
+                                                      curr-value (.doubleValue (.getValue psar (dec series-length)))]
+                                                  (cond
+                                                    (and (> curr-value (:h (nth @klines (dec series-length)))) (< prev-value (:l (nth @klines (- series-length 2)))))
+                                                    (prn "sell signal")
+                                                    (and (< curr-value (:l (nth @klines (dec series-length)))) (> prev-value (:h (nth @klines (- series-length 2)))))
+                                                    (prn "buy signal"))))))))
+                                    (catch Exception e (prn e))))))))
+
+       #_(scheduler/start!
+          (* 5 60000)
+          (fn []
+            (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
+                  high-price (parse-double (:highPrice mini-ticker-data))
+                  low-price (parse-double (:lowPrice mini-ticker-data))
+                  max-price-change (- high-price low-price)
+                  price-change (parse-double (:priceChange mini-ticker-data))
+                  interval-end-time (System/currentTimeMillis)
+                  interval-start-time (- interval-end-time (* 15 60000))]
+              (when (and (> price-change 0) (> max-price-change 200))
+                (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))

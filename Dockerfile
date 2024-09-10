@@ -35,5 +35,6 @@ RUN git clone \
 
 WORKDIR /src
 COPY . /src
+COPY lgbm.conf /src/lgbm.conf
 RUN lein do clean, uberjar
 CMD ["java", "-jar", "target/hft.jar"]

@@ -1,15 +1,27 @@
 (ns hft.market.binance
   (:require [jsonista.core :as j])
-  (:import [com.binance.connector.client.impl SpotClientImpl]))
+  (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]
+           [java.util ArrayList]))
 
 (def trade-client (atom nil))
 (def market-client (atom nil))
+(def ws-client (atom nil))
 
 (defn init []
   (reset! trade-client (.createTrade (SpotClientImpl. (System/getenv "BINANCE_API_KEY")
                                                       (System/getenv "BINANCE_SECRET")
                                                       (System/getenv "BINANCE_URL"))))
   (reset! market-client (.createMarket (SpotClientImpl. (System/getenv "BINANCE_URL")))))
+
+(defn subscribe [streams callback]
+  (when-not @ws-client
+    (reset! ws-client (WebSocketStreamClientImpl.)))
+  (.combineStreams @ws-client (ArrayList. streams) callback))
+
+(defn unsubscribe [stream]
+  (when-not @ws-client
+    (reset! ws-client (WebSocketStreamClientImpl.)))
+  (.closeAllConnections @ws-client))
 
 (defn jread [v]
   (j/read-value v j/keyword-keys-object-mapper))

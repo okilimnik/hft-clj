@@ -8,7 +8,8 @@
                  [org.martinklepsch/clj-http-lite "0.4.3"]
                  [metosin/jsonista "0.3.8"]
                  [alekcz/fire "0.5.1-SNAPSHOT"]
-                 [io.github.binance/binance-connector-java "3.2.0"]]
+                 [io.github.binance/binance-connector-java "3.2.0"]
+                 [org.ta4j/ta4j-core "0.16"]]
   :main hft.core
   :uberjar-name "hft.jar"
   :profiles {:uberjar {:aot :all}})
