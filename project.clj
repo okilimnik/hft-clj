@@ -5,6 +5,7 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [org.clojure/core.async "1.6.681"]
+                 [org.clojure/data.csv "1.1.0"]
                  [org.martinklepsch/clj-http-lite "0.4.3"]
                  [metosin/jsonista "0.3.8"]
                  [alekcz/fire "0.5.1-SNAPSHOT"]

@@ -1,5 +1,6 @@
 (ns hft.dataset
   (:require [clojure.core.async :as a :refer [<!!]]
+            [clojure.data.csv :as csv]
             [clojure.java.io :as io]
             [clojure.pprint :refer [pprint]]
             [clojure.string :as str]
@@ -16,7 +17,8 @@
 (def INPUT-SIZE 20)
 (def MIN-QUANTITY 10)
 (def PRICE-INTERVAL-FOR-INDEXING 100)
-(def DATA-FOLDER "dataset")
+(def STOP-LOSS 100)
+(def DATAFILE "data.tsv")
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -91,18 +93,20 @@
      :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)
      :ask-first-qty-change-ratio (first-qty-change-ratio ask-levels-with-max-qty)}))
 
-(defn save! [inputs]
-  (let [data (->> (for [k (keys (first inputs))]
-                    [k (mapv k inputs)])
-                  (into {}))
-        path (str DATA-FOLDER "/" (System/currentTimeMillis))
-        f (io/file path)]
-    (spit path (with-out-str (pprint data)))
-    (gcloud/upload-file! f)
-    (io/delete-file f)))
+(def order (atom nil))
 
-(defn- init []
-  (.mkdir (io/file DATA-FOLDER)))
+(defn open-order [price inputs]
+  (reset! order {:price price
+                 :inputs inputs}))
+
+(defn ->tsv [label data]
+  (spit DATAFILE (str/join " " (concat [label] (mapcat :bids data) (mapcat :asks data) ["\n"])) :append true))
+
+(defn close-order [price]
+  (if (> (:price @order) price)
+    (->tsv 1 (:inputs @order))
+    (->tsv 0 (:inputs @order)))
+  (reset! order nil))
 
 (defn pipeline-v1 []
   (init)
@@ -135,6 +139,10 @@
                                              (let [event (bi/jread event-str)
                                                    data (:k (:data event))
                                                    kline-closed? (:x data)]
+                                               (when (and @order
+                                                          (>= (- (:price @order) (:c (first @klines)))
+                                                              STOP-LOSS))
+                                                 (close-order (:c (first @klines))))
                                                (cond
                                                  (and (= klines-1m (:stream event))
                                                       kline-closed?)
@@ -150,8 +158,9 @@
                                                                         (pop $)
                                                                         $)))
                                                      (when (>= (count @klines) series-length) ;; warmed-up
+
                                                        (let [series (BaseBarSeries. "1m")]
-                                                         (doseq [{:keys [o h l c t v n]} @klines]
+                                                         (doseq [{:keys [o h l c t v n]} (reverse @klines)]
                                                            (let [date (ZonedDateTime/ofInstant
                                                                        (Instant/ofEpochSecond t)
                                                                        (ZoneId/systemDefault))]
@@ -160,24 +169,19 @@
                                                                prev-value (.doubleValue (.getValue psar (- series-length 2)))
                                                                curr-value (.doubleValue (.getValue psar (dec series-length)))]
                                                            (cond
-                                                             (and (> curr-value (:h (nth @klines (dec series-length)))) (< prev-value (:l (nth @klines (- series-length 2)))))
+                                                             (and (> curr-value (:h (first @klines))) (< prev-value (:l (second @klines))))
                                                              (do (prn "sell signal")
+                                                                 (when @order
+                                                                   (close-order (:c (first @klines))))
                                                                  #_(->> @inputs
                                                                         save!))
-                                                             (and (< curr-value (:l (nth @klines (dec series-length)))) (> prev-value (:h (nth @klines (- series-length 2)))))
+                                                             (and (< curr-value (:l (first @klines))) (> prev-value (:h (second @klines))))
                                                              (do (prn "buy signal")
-                                                                 (save! @inputs)))))))))
+                                                                 (open-order (:c (first @klines)) @inputs)))))))))
                                              (catch Exception e (prn e))))))))
 
-       #_(scheduler/start!
-          (* 5 60000)
-          (fn []
-            (let [mini-ticker-data (bi/mini-ticker! SYMBOL "15m")
-                  high-price (parse-double (:highPrice mini-ticker-data))
-                  low-price (parse-double (:lowPrice mini-ticker-data))
-                  max-price-change (- high-price low-price)
-                  price-change (parse-double (:priceChange mini-ticker-data))
-                  interval-end-time (System/currentTimeMillis)
-                  interval-start-time (- interval-end-time (* 15 60000))]
-              (when (and (> price-change 0) (> max-price-change 200))
-                (upload-buy-alert-data! interval-start-time interval-end-time)))))]))))
+       (scheduler/start!
+        (* 3 60 60 1000) ;; every 3 hour
+        (fn []
+          (let [f (io/file DATAFILE)]
+            (gcloud/upload-file! f))))]))))
