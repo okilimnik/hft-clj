@@ -127,7 +127,7 @@
                                (pop $)
                                $))))))
        (vthread
-        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")
+        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1s")
               series-length 50]
           (bi/subscribe [klines-1m]
                         (reify WebSocketMessageCallback
@@ -157,24 +157,26 @@
                                                      (when (>= (count @klines) series-length) ;; warmed-up
 
                                                        (let [series (BaseBarSeries. "1m")]
-                                                         (doseq [{:keys [o h l c t v n]} (reverse @klines)]
+                                                         (doseq [{:keys [o h l c t v n]} @klines]
                                                            (let [date (ZonedDateTime/ofInstant
-                                                                       (Instant/ofEpochSecond t)
+                                                                       (Instant/ofEpochMilli t)
                                                                        (ZoneId/systemDefault))]
                                                              (.addBar ^BarSeries series date o h l c v n)))
                                                          (let [psar (ParabolicSarIndicator. series)
-                                                               prev-value (.doubleValue (.getValue psar (- series-length 2)))
-                                                               curr-value (.doubleValue (.getValue psar (dec series-length)))]
+                                                               prev-index (- series-length 2)
+                                                               prev-value (.doubleValue (.getValue psar prev-index))
+                                                               curr-index (dec series-length)
+                                                               curr-value (.doubleValue (.getValue psar curr-index))]
                                                            (cond
-                                                             (and (> curr-value (:h (first @klines))) (< prev-value (:l (second @klines))))
+                                                             (and (> curr-value (:h (nth @klines curr-index))) (< prev-value (:l (nth @klines prev-index))))
                                                              (do (prn "sell signal")
                                                                  (when @order
-                                                                   (close-order (:c (first @klines))))
+                                                                   (close-order (:c (nth @klines curr-index))))
                                                                  #_(->> @inputs
                                                                         save!))
-                                                             (and (< curr-value (:l (first @klines))) (> prev-value (:h (second @klines))))
+                                                             (and (< curr-value (:l (nth @klines curr-index))) (> prev-value (:h (nth @klines prev-index))))
                                                              (do (prn "buy signal")
-                                                                 (open-order (:c (first @klines)) @inputs)))))))))
+                                                                 (open-order (:c (nth @klines curr-index)) @inputs)))))))))
                                              (catch Exception e (prn e))))))))
 
        (scheduler/start!
