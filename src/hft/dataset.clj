@@ -17,7 +17,6 @@
 (def MIN-QUANTITY 10)
 (def PRICE-INTERVAL-FOR-INDEXING 100)
 (def DATA-FOLDER "dataset")
-(def opened-order? (atom false))
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -66,12 +65,6 @@
   (float (/ (second (first levels))
             terminator-qty)))
 
-#_(defn ->svm [data]
-  (for [row data
-        :let [label (:label row)
-              input (:input row)]]
-    #_(str label " " (str/join " " (map-indexed vector input)))))
-
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
         min-price (get-min-price mid-price)
@@ -102,18 +95,10 @@
   (let [data (->> (for [k (keys (first inputs))]
                     [k (mapv k inputs)])
                   (into {}))
-        path (str DATA-FOLDER "/" (System/currentTimeMillis))]
-    (spit path (with-out-str (pprint data)))))
-
-(defn upload-buy-alert-data! [start end]
-  (doall
-   (for [f (file-seq (io/file DATA-FOLDER))
-         :let [file-time (parse-long (.getName f))]
-         :when (and (.isFile f)
-                    (> end file-time start))]
-     (gcloud/upload-file! f)))
-  (doseq [f (file-seq (io/file DATA-FOLDER))
-          :when (.isFile f)]
+        path (str DATA-FOLDER "/" (System/currentTimeMillis))
+        f (io/file path)]
+    (spit path (with-out-str (pprint data)))
+    (gcloud/upload-file! f)
     (io/delete-file f)))
 
 (defn- init []
@@ -126,7 +111,7 @@
         klines (atom clojure.lang.PersistentQueue/EMPTY)]
     (<!!
      (a/merge
-      [#_(scheduler/start!
+      [(scheduler/start!
         6000
         (fn []
           (let [order-book (bi/depth! SYMBOL 5000)]
@@ -139,51 +124,50 @@
                              (conj $ (order-book->quantities-indexed-by-price-level order-book (apply max @max-bids)))
                              (if (> (count $) INPUT-SIZE)
                                (pop $)
-                               $)))
-            (when (= (count @inputs) INPUT-SIZE)
-              (->> @inputs
-                   save!)))))
+                               $))))))
        (vthread
-        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1s")
+        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")
               series-length 50]
           (bi/subscribe [klines-1m]
                         (reify WebSocketMessageCallback
                           ^void (onMessage [_ event-str]
-                                  (try
-                                    (let [event (bi/jread event-str)
-                                          data (:k (:data event))
-                                          kline-closed? (:x data)]
-                                      (cond
-                                        (and (= klines-1m (:stream event))
-                                             kline-closed?)
-                                        (do (swap! klines #(as-> % $
-                                                             (conj $ (-> data
-                                                                         (select-keys [:t :o :h :l :c :v :n])
-                                                                         (update :o parse-double)
-                                                                         (update :h parse-double)
-                                                                         (update :l parse-double)
-                                                                         (update :c parse-double)
-                                                                         (update :v parse-double)))
-                                                             (if (> (count $) series-length)
-                                                               (pop $)
-                                                               $)))
-                                            (prn "added kline " (count @klines))
-                                            (when (>= (count @klines) series-length)
-                                              (let [series (BaseBarSeries. "1m")]
-                                                (doseq [{:keys [o h l c t v n]} @klines]
-                                                  (let [date (ZonedDateTime/ofInstant
-                                                              (Instant/ofEpochSecond t)
-                                                              (ZoneId/systemDefault))]
-                                                    (.addBar ^BarSeries series date o h l c v n)))
-                                                (let [psar (ParabolicSarIndicator. series)
-                                                      prev-value (.doubleValue (.getValue psar (- series-length 2)))
-                                                      curr-value (.doubleValue (.getValue psar (dec series-length)))]
-                                                  (cond
-                                                    (and (> curr-value (:h (nth @klines (dec series-length)))) (< prev-value (:l (nth @klines (- series-length 2)))))
-                                                    (prn "sell signal")
-                                                    (and (< curr-value (:l (nth @klines (dec series-length)))) (> prev-value (:h (nth @klines (- series-length 2)))))
-                                                    (prn "buy signal"))))))))
-                                    (catch Exception e (prn e))))))))
+                                           (try
+                                             (let [event (bi/jread event-str)
+                                                   data (:k (:data event))
+                                                   kline-closed? (:x data)]
+                                               (cond
+                                                 (and (= klines-1m (:stream event))
+                                                      kline-closed?)
+                                                 (do (swap! klines #(as-> % $
+                                                                      (conj $ (-> data
+                                                                                  (select-keys [:t :o :h :l :c :v :n])
+                                                                                  (update :o parse-double)
+                                                                                  (update :h parse-double)
+                                                                                  (update :l parse-double)
+                                                                                  (update :c parse-double)
+                                                                                  (update :v parse-double)))
+                                                                      (if (> (count $) series-length)
+                                                                        (pop $)
+                                                                        $)))
+                                                     (when (>= (count @klines) series-length) ;; warmed-up
+                                                       (let [series (BaseBarSeries. "1m")]
+                                                         (doseq [{:keys [o h l c t v n]} @klines]
+                                                           (let [date (ZonedDateTime/ofInstant
+                                                                       (Instant/ofEpochSecond t)
+                                                                       (ZoneId/systemDefault))]
+                                                             (.addBar ^BarSeries series date o h l c v n)))
+                                                         (let [psar (ParabolicSarIndicator. series)
+                                                               prev-value (.doubleValue (.getValue psar (- series-length 2)))
+                                                               curr-value (.doubleValue (.getValue psar (dec series-length)))]
+                                                           (cond
+                                                             (and (> curr-value (:h (nth @klines (dec series-length)))) (< prev-value (:l (nth @klines (- series-length 2)))))
+                                                             (do (prn "sell signal")
+                                                                 #_(->> @inputs
+                                                                        save!))
+                                                             (and (< curr-value (:l (nth @klines (dec series-length)))) (> prev-value (:h (nth @klines (- series-length 2)))))
+                                                             (do (prn "buy signal")
+                                                                 (save! @inputs)))))))))
+                                             (catch Exception e (prn e))))))))
 
        #_(scheduler/start!
           (* 5 60000)

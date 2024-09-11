@@ -12,7 +12,7 @@
   (when-not @token (init!))
   (try
     (when (<= retry retries)
-      (storage/upload! (str "0509_0010/" (.getName f)) (.getAbsolutePath f) "text/plain" @token))
+      (storage/upload! (str "1109_2000/" (.getName f)) (.getAbsolutePath f) "text/plain" @token))
     (catch Exception e
       (prn e)
       (init!)
