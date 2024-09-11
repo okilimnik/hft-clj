@@ -1,8 +1,6 @@
 (ns hft.dataset
   (:require [clojure.core.async :as a :refer [<!!]]
-            [clojure.data.csv :as csv]
             [clojure.java.io :as io]
-            [clojure.pprint :refer [pprint]]
             [clojure.string :as str]
             [hft.async :refer [vthread]]
             [hft.gcloud :as gcloud]
@@ -109,7 +107,6 @@
   (reset! order nil))
 
 (defn pipeline-v1 []
-  (init)
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)
         klines (atom clojure.lang.PersistentQueue/EMPTY)]
@@ -184,4 +181,5 @@
         (* 3 60 60 1000) ;; every 3 hour
         (fn []
           (let [f (io/file DATAFILE)]
-            (gcloud/upload-file! f))))]))))
+            (when (.exists f)
+              (gcloud/upload-file! f)))))]))))
