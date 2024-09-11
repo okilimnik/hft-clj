@@ -127,7 +127,7 @@
                                (pop $)
                                $))))))
        (vthread
-        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1s")
+        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")
               series-length 50]
           (bi/subscribe [klines-1m]
                         (reify WebSocketMessageCallback
