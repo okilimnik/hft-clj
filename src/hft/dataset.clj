@@ -15,6 +15,7 @@
 (def INPUT-SIZE 20)
 (def MIN-QUANTITY 10)
 (def PRICE-INTERVAL-FOR-INDEXING 100)
+(def STOP-PROFIT 50)
 (def STOP-LOSS 100)
 (def DATAFILE "data.tsv")
 
@@ -101,7 +102,7 @@
   (spit DATAFILE (str/join " " (concat [label] (mapcat :bids data) (mapcat :asks data) ["\n"])) :append true))
 
 (defn close-order [price]
-  (if (> (:price @order) price)
+  (if (>= (- price (:price @order)) STOP-PROFIT)
     (->tsv 1 (:inputs @order))
     (->tsv 0 (:inputs @order)))
   (reset! order nil))
