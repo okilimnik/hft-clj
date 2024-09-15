@@ -101,10 +101,9 @@
 
 (defn ->tsv [label data]
   (spit DATAFILE (str/join " " (concat [label]
-                                       (mapcat #(-> (:bids %)
-                                                    (map math/floor)) data)
-                                       (mapcat #(-> (:asks %)
-                                                    (map math/floor)) data) ["\n"])) :append true))
+                                       (mapcat #(map math/floor (:bids %)) data)
+                                       (mapcat #(map math/floor (:asks %)) data)
+                                       ["\n"])) :append true))
 
 (defn close-order [price]
   (if (>= (- price (:price @order)) STOP-PROFIT)
