@@ -5,7 +5,7 @@
             [hft.async :refer [vthread]]
             [hft.gcloud :as gcloud]
             [hft.market.binance :as bi]
-            [hft.scheduler :as scheduler]) 
+            [hft.scheduler :as scheduler])
   (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
            [java.time Instant ZoneId ZonedDateTime]
            [org.ta4j.core BarSeries BaseBarSeries]
@@ -99,7 +99,11 @@
                  :inputs inputs}))
 
 (defn ->tsv [label data]
-  (spit DATAFILE (str/join " " (concat [label] (mapcat :bids data) (mapcat :asks data) ["\n"])) :append true))
+  (spit DATAFILE (str/join " " (concat [label]
+                                       (mapcat #(-> (:bids %)
+                                                    (map (partial format "%.2f"))) data)
+                                       (mapcat #(-> (:asks %)
+                                                    (map (partial format "%.2f"))) data) ["\n"])) :append true))
 
 (defn close-order [price]
   (if (>= (- price (:price @order)) STOP-PROFIT)
