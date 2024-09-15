@@ -1,6 +1,7 @@
 (ns hft.dataset
   (:require [clojure.core.async :as a :refer [<!!]]
             [clojure.java.io :as io]
+            [clojure.math :as math]
             [clojure.string :as str]
             [hft.async :refer [vthread]]
             [hft.gcloud :as gcloud]
@@ -101,9 +102,9 @@
 (defn ->tsv [label data]
   (spit DATAFILE (str/join " " (concat [label]
                                        (mapcat #(-> (:bids %)
-                                                    (map (partial format "%.2f"))) data)
+                                                    (map math/floor)) data)
                                        (mapcat #(-> (:asks %)
-                                                    (map (partial format "%.2f"))) data) ["\n"])) :append true))
+                                                    (map math/floor)) data) ["\n"])) :append true))
 
 (defn close-order [price]
   (if (>= (- price (:price @order)) STOP-PROFIT)
