@@ -1,7 +1,6 @@
 (ns hft.dataset
   (:require [clojure.core.async :as a :refer [<!!]]
             [clojure.java.io :as io]
-            [clojure.math :as math]
             [clojure.string :as str]
             [hft.async :refer [vthread]]
             [hft.gcloud :as gcloud]
@@ -12,13 +11,13 @@
            [org.ta4j.core BarSeries BaseBarSeries]
            [org.ta4j.core.indicators ParabolicSarIndicator]))
 
-(def SYMBOL "BTCUSDT")
+;; ["KDAUSDT" "SAGAUSDT" "SEIUSDT" "BLZUSDT" "ALTUSDT" "BLURUSDT" "TIAUSDT" "SUIUSDT" "FTMUSDT" "WUSDT" "ZROUSDT" "LQTYUSDT"]
+(def SYMBOL (System/getenv "SYMBOL"))
 (def INPUT-SIZE 20)
-(def MIN-QUANTITY 10)
-(def PRICE-INTERVAL-FOR-INDEXING 100)
-(def STOP-PROFIT 50)
-(def STOP-LOSS 100)
-(def DATAFILE "data.tsv")
+(def DATAFILE (str SYMBOL ".tsv"))
+(def PRICE-PERCENT-FOR-INDEXING 0.002)
+(def STOP-PROFIT-PRICE-PERCENT 0.0005)
+(def STOP-LOSS-PRICE-PERCENT 0.001)
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -34,38 +33,10 @@
       result)))
 
 (defn get-min-price [mid-price]
-  (- mid-price (* PRICE-INTERVAL-FOR-INDEXING (/ INPUT-SIZE 2))))
+  (- mid-price (* mid-price PRICE-PERCENT-FOR-INDEXING (/ INPUT-SIZE 2))))
 
 (defn get-max-price [mid-price]
-  (+ mid-price (* PRICE-INTERVAL-FOR-INDEXING (/ INPUT-SIZE 2))))
-
-(defn get-levels-with-max-qty-sorted [prices]
-  (->> (map-indexed vector prices)
-       (sort-by second >)
-       (take 3)
-       vec))
-
-(defn get-distance-from-terminator [levels terminator-level]
-  (abs (- (ffirst levels) terminator-level)))
-
-(defn get-first-distance [levels]
-  (abs (- (ffirst levels) (first (second levels)))))
-
-(defn get-terminator-level-and-qty [prices bids?]
-  (let [f (if bids? dec inc)]
-    (loop [i (if bids? (dec INPUT-SIZE) 0)]
-      (let [qty (nth prices i)]
-        (if (> qty MIN-QUANTITY)
-          [i qty]
-          (recur (f i)))))))
-
-(defn first-qty-change-ratio [levels]
-  (float (/ (second (first levels))
-            (second (second levels)))))
-
-(defn qty-change-ratio [levels terminator-qty]
-  (float (/ (second (first levels))
-            terminator-qty)))
+  (+ mid-price (* mid-price PRICE-PERCENT-FOR-INDEXING (/ INPUT-SIZE 2))))
 
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
@@ -73,25 +44,9 @@
         max-price (get-max-price mid-price)
         price-interval (- max-price min-price)
         bids (get-image-column min-price max-price price-interval (:bids order-book))
-        asks (get-image-column min-price max-price price-interval (:asks order-book))
-        bid-levels-with-max-qty-sorted (get-levels-with-max-qty-sorted bids)
-        ask-levels-with-max-qty (get-levels-with-max-qty-sorted asks)
-        [asks-terminator-level asks-terminator-qty] (get-terminator-level-and-qty asks false)
-        [bids-terminator-level bids-terminator-qty] (get-terminator-level-and-qty bids true)]
+        asks (get-image-column min-price max-price price-interval (:asks order-book))]
     {:bids bids
-     :bids-terminator-level-and-qty [bids-terminator-level bids-terminator-qty]
-     :bid-levels-of-max-qty bid-levels-with-max-qty-sorted
-     :max-bid-distance (get-distance-from-terminator bid-levels-with-max-qty-sorted bids-terminator-level)
-     :bid-first-distance (get-first-distance bid-levels-with-max-qty-sorted)
-     :bid-qty-change-ratio (qty-change-ratio bid-levels-with-max-qty-sorted bids-terminator-qty)
-     :bid-first-qty-change-ratio (first-qty-change-ratio bid-levels-with-max-qty-sorted)
-     :asks asks
-     :asks-terminator-level-and-qty [asks-terminator-level asks-terminator-qty]
-     :ask-levels-of-max-qty ask-levels-with-max-qty
-     :max-ask-distance (get-distance-from-terminator ask-levels-with-max-qty asks-terminator-level)
-     :ask-first-distance (get-first-distance ask-levels-with-max-qty)
-     :ask-qty-change-ratio (qty-change-ratio ask-levels-with-max-qty asks-terminator-qty)
-     :ask-first-qty-change-ratio (first-qty-change-ratio ask-levels-with-max-qty)}))
+     :asks asks}))
 
 (def order (atom nil))
 
@@ -100,13 +55,22 @@
                  :inputs inputs}))
 
 (defn ->tsv [label data]
-  (spit DATAFILE (str/join " " (concat [label]
-                                       (mapcat #(map math/floor (:bids %)) data)
-                                       (mapcat #(map math/floor (:asks %)) data)
-                                       ["\n"])) :append true))
+  (let [qties (concat (mapcat :bids data)
+                      (mapcat :asks data))
+        max-qty (apply max qties)
+        min-qty (apply min qties)
+        ratio (/ 255.0 (- max-qty min-qty))
+        scale #(-> %
+                   (- min-qty)
+                   (* ratio)
+                   long)]
+    (spit DATAFILE (str/join " " (concat [label]
+                                         (mapcat #(map scale (:bids %)) data)
+                                         (mapcat #(map scale (:asks %)) data)
+                                         ["\n"])) :append true)))
 
 (defn close-order [price]
-  (if (>= (- price (:price @order)) STOP-PROFIT)
+  (if (>= (- price (:price @order)) (* price STOP-PROFIT-PRICE-PERCENT))
     (->tsv 1 (:inputs @order))
     (->tsv 0 (:inputs @order)))
   (reset! order nil))
@@ -132,18 +96,20 @@
                                (pop $)
                                $))))))
        (vthread
-        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")
-              series-length 50]
+        (let [series-length 50
+              klines-1m (str (str/lower-case SYMBOL) "@kline_1m")]
           (bi/subscribe [klines-1m]
                         (reify WebSocketMessageCallback
                           ^void (onMessage [_ event-str]
                                            (try
                                              (let [event (bi/jread event-str)
                                                    data (:k (:data event))
-                                                   kline-closed? (:x data)]
+                                                   kline-closed? (:x data)
+                                                   current-price (:c (first @klines))]
                                                (when (and @order
-                                                          (>= (- (:price @order) (:c (first @klines)))
-                                                              STOP-LOSS))
+                                                          (>= (- (:price @order) current-price)
+                                                              (* current-price STOP-LOSS-PRICE-PERCENT)))
+                                                 ;; closing with loss
                                                  (close-order (:c (first @klines))))
                                                (cond
                                                  (and (= klines-1m (:stream event))
