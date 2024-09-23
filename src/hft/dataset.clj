@@ -19,7 +19,7 @@
 (def PRICE-PERCENT-FOR-INDEXING 0.002)
 (def STOP-PROFIT-PRICE-PERCENT 0.0005)
 (def STOP-LOSS-PRICE-PERCENT 0.001)
-(def TREND-STRENGTH-THRESHOLD 20)
+(def TREND-STRENGTH-THRESHOLD 50)
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -137,7 +137,6 @@
                                                              (.addBar ^BarSeries series date o h l c v n)))
                                                          (let [psar (ParabolicSarIndicator. series)
                                                                adx (ADXIndicator. series INPUT-SIZE)
-                               
                                                                curr-index (dec series-length)
                                                                adx-value (.longValue (.getValue adx curr-index))
                                                                psar-value (.doubleValue (.getValue psar curr-index))]
