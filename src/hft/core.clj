@@ -1,6 +1,6 @@
 (ns hft.core
   (:gen-class)
-  (:require [hft.dataset :refer [pipeline-v1]]))
+  (:require [hft.dataset :refer [range-market-pipeline]]))
 
 (defn -main [& _args]
-  (pipeline-v1))
+  (range-market-pipeline))
