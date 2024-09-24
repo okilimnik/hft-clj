@@ -10,7 +10,8 @@
            [java.time Instant ZoneId ZonedDateTime]
            [org.ta4j.core BarSeries BaseBarSeries]
            [org.ta4j.core.indicators ParabolicSarIndicator]
-           [org.ta4j.core.indicators.adx ADXIndicator]))
+           [org.ta4j.core.indicators.adx ADXIndicator]
+           [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator]))
 
 ;; ["BNBUSDT" "BTCUSDT" "ETHUSDT" "SOLUSDT" "PEPEUSDT" "NEIROUSDT" "DOGSUSDT" "WIFUSDT" "FETUSDT" "SAGAUSDT"]
 (def SYMBOL (System/getenv "SYMBOL"))
@@ -20,6 +21,7 @@
 (def STOP-PROFIT-PRICE-PERCENT 0.0005)
 (def STOP-LOSS-PRICE-PERCENT 0.001)
 (def TREND-STRENGTH-THRESHOLD 50)
+(def KLINES-SERIES-LENGTH 100)
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -77,7 +79,7 @@
     (->tsv 0 (:inputs @order)))
   (reset! order nil))
 
-(defn pipeline-v1 []
+(defn range-market-pipeline []
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)
         klines (atom clojure.lang.PersistentQueue/EMPTY)]
@@ -98,8 +100,7 @@
                                (pop $)
                                $))))))
        (vthread
-        (let [series-length 50
-              klines-1m (str (str/lower-case SYMBOL) "@kline_1m")]
+        (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")]
           (bi/subscribe [klines-1m]
                         (reify WebSocketMessageCallback
                           ^void (onMessage [_ event-str]
@@ -124,10 +125,10 @@
                                                                                   (update :l parse-double)
                                                                                   (update :c parse-double)
                                                                                   (update :v parse-double)))
-                                                                      (if (> (count $) series-length)
+                                                                      (if (> (count $) KLINES-SERIES-LENGTH)
                                                                         (pop $)
                                                                         $)))
-                                                     (when (>= (count @klines) series-length) ;; warmed-up
+                                                     (when (>= (count @klines) KLINES-SERIES-LENGTH) ;; warmed-up
 
                                                        (let [series (BaseBarSeries. "1m")]
                                                          (doseq [{:keys [o h l c t v n]} @klines]
@@ -135,9 +136,36 @@
                                                                        (Instant/ofEpochMilli t)
                                                                        (ZoneId/systemDefault))]
                                                              (.addBar ^BarSeries series date o h l c v n)))
-                                                         (let [psar (ParabolicSarIndicator. series)
+                                                         (let [curr-index (dec KLINES-SERIES-LENGTH)
+                                                               chikou (IchimokuChikouSpanIndicator. series)
+                                                               chikou-value (.doubleValue (.getValue chikou curr-index))
+                                                               chikou-price (nth @klines (- curr-index 26))
+                                                               prev-chikou-value (.doubleValue (.getValue chikou (dec curr-index)))
+                                                               prev-chikou-price (nth @klines (- curr-index 27))
+                                                               kijun (IchimokuKijunSenIndicator. series)
+                                                               kijun-value (.doubleValue (.getValue kijun curr-index))
+                                                               price (nth @klines curr-index)]
+                                                           (cond
+                                                             ;; chikou crossed the price down up
+                                                             (and (> chikou-value (:h chikou-price))
+                                                                  (<= prev-chikou-value (:h prev-chikou-price)))
+                                                             (do (prn "buy signal")
+                                                                 (open-order (:c price) @inputs))
+
+                                                             ;; kijun crosses the price, take-profit/stop-loss signal
+                                                             (< (:l price) kijun-value (:h price))
+                                                             (when @order
+                                                               (close-order (:c price)))
+
+                                                             ;; chikou crossed the price up down
+                                                             (and (< chikou-value (:l chikou-price))
+                                                                  (>= prev-chikou-value (:l prev-chikou-price)))
+                                                             (do (prn "sell signal")
+                                                                 (when @order
+                                                                   (close-order (:c price))))))
+                                                         #_(let [psar (ParabolicSarIndicator. series)
                                                                adx (ADXIndicator. series INPUT-SIZE)
-                                                               curr-index (dec series-length)
+                                                               curr-index (dec KLINES-SERIES-LENGTH)
                                                                adx-value (.longValue (.getValue adx curr-index))
                                                                psar-value (.doubleValue (.getValue psar curr-index))]
                                                            (cond
