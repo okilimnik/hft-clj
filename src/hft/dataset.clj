@@ -153,8 +153,9 @@
                                                              (cond
                                                                buy-signal?
                                                                (do (prn "buy signal")
-                                                                   (open-order price @inputs))
-
+                                                                   (when-not @order
+                                                                     (open-order price @inputs)))
+                                                               
                                                                sell-signal?
                                                                (do (prn "sell signal")
                                                                    (when @order
