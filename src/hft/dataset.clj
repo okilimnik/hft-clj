@@ -155,7 +155,7 @@
                                                                (do (prn "buy signal")
                                                                    (when-not @order
                                                                      (open-order price @inputs)))
-                                                               
+
                                                                sell-signal?
                                                                (do (prn "sell signal")
                                                                    (when @order
@@ -184,7 +184,9 @@
         (* 3 60 60 1000) ;; every 3 hour
         (fn []
           (let [f (io/file DATAFILE)]
+            (prn "checking data file")
             (when (.exists f)
+              (prn "uploading data file")
               (gcloud/upload-file! f)))))]))))
 
 (defn trend-market-pipeline []
