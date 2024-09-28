@@ -1,19 +1,25 @@
 (ns hft.gcloud
-  (:require [fire.auth :as auth]
-            [fire.storage :as storage]))
+  (:require [clojure.java.io :as io])
+  (:import [com.google.cloud.storage BlobId BlobInfo StorageOptions Storage$BlobWriteOption]))
 
-(def token (atom nil))
-(def retries 1)
+(def storage (atom nil))
+(def bucket-name "neusa-datasets")
 
 (defn init! []
-  (reset! token (auth/create-token "GOOGLE_APPLICATION_CREDENTIALS")))
+  (reset! storage (.getService (StorageOptions/getDefaultInstance))))
 
-(defn upload-file! [f & {:keys [retry] :or {retry 0}}]
-  (when-not @token (init!))
+(defn upload-file! [f]
   (try
-    (when (<= retry retries)
-      (storage/upload! (str "1909_0753/" (.getName f)) (.getAbsolutePath f) "text/plain" @token))
-    (catch Exception e
-      (prn e)
-      (init!)
-      (upload-file! f :retry (inc retry)))))
+    (when-not @storage (init!))
+    (let [blob-id (BlobId/of bucket-name (str "2809/" (.getName f)))
+          blob-info (.build (BlobInfo/newBuilder blob-id))]
+      (.createFrom @storage blob-info (io/input-stream f) (into-array Storage$BlobWriteOption [])))
+    (catch Exception e (prn e))))
+
+(defn upload-model! [f]
+  (try
+    (when-not @storage (init!))
+    (let [blob-id (BlobId/of bucket-name (str "models/resnet50/" (.getName f)))
+          blob-info (.build (BlobInfo/newBuilder blob-id))]
+      (.createFrom @storage blob-info (io/input-stream f) (into-array Storage$BlobWriteOption [])))
+    (catch Exception e (prn e))))
