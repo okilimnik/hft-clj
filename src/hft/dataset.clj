@@ -150,7 +150,8 @@
                                                           (swap! order-book #(-> %
                                                                                  (assoc :lastUpdateId (:u data))
                                                                                  (update :bids (fn [bids] (update-prices bids b)))
-                                                                                 (update :asks (fn [asks] (update-prices asks a)))))))))
+                                                                                 (update :asks (fn [asks] (update-prices asks a))))))
+                                                        (reset! order-book-warmed-up? true))))
 
                                                   (and (= (:stream event) klines-1m)
                                                        ;; kline closed
