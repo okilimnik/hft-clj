@@ -1,6 +1,7 @@
 (ns hft.dataset
   (:require [clojure.core.async :as a :refer [<!! thread]]
             [clojure.java.io :as io]
+            [clojure.set :as set]
             [clojure.string :as str]
             [hft.gcloud :as gcloud]
             [hft.market.binance :as bi]
@@ -79,24 +80,22 @@
     (->tsv 0 (:inputs @order)))
   (reset! order nil))
 
-(defn remove-low-volume-prices [prices]
-  (reduce-kv (fn [m k v]
-               (if (> (parse-double v) 1)
-                 m
-                 (dissoc m k))) prices prices))
-
 (defn update-prices [book price-changes]
   (doseq [[price volume] price-changes]
     (if (> (parse-double volume) 1)
       (assoc! book price volume)
       (dissoc! book price))))
 
+(defn update-order-book [order-book data]
+  (when (> (:u data) (:lastUpdateId @order-book))
+    (swap! order-book #(-> %
+                           (assoc :lastUpdateId (:u data))
+                           (update :bids (fn [bids] (update-prices bids (:b data))))
+                           (update :asks (fn [asks] (update-prices asks (:a data))))))))
+
 (defn init-order-book! [order-book]
   (let [data (bi/depth! SYMBOL 5000)]
-    (swap! order-book #(-> %
-                           (assoc :lastUpdateId (:lastUpdateId data))
-                           (update :bids #(update-prices % (:bids data)))
-                           (update :asks #(update-prices % (:asks data)))))))
+    (update-order-book order-book (set/rename-keys data {:asks :a :bids :b :lastUpdateId :u}))))
 
 (defn range-market-pipeline []
   (println "SYMBOL is: " SYMBOL)
@@ -138,19 +137,13 @@
 
                                                   (= (:stream event) depth)
                                                   (if @order-book-warmed-up?
-                                                    (when (> (:u data) (:lastUpdateId @order-book))
-                                                      (swap! order-book #(-> %
-                                                                             (update :bids (fn [bids] (update-prices bids (:b data))))
-                                                                             (update :asks (fn [asks] (update-prices asks (:a data)))))))
+                                                    (update-order-book order-book data)
                                                     (do
                                                       (swap! order-book-warming-buffer conj data)
                                                       (when (> (count @order-book-warming-buffer) 10)
                                                         (init-order-book! order-book)
-                                                        (doseq [[a b] (remove #(<= (:u %) (:lastUpdateId @order-book)) @order-book-warming-buffer)]
-                                                          (swap! order-book #(-> %
-                                                                                 (assoc :lastUpdateId (:u data))
-                                                                                 (update :bids (fn [bids] (update-prices bids b)))
-                                                                                 (update :asks (fn [asks] (update-prices asks a))))))
+                                                        (doseq [buffered-data @order-book-warming-buffer]
+                                                          (update-order-book order-book buffered-data))
                                                         (reset! order-book-warmed-up? true))))
 
                                                   (and (= (:stream event) klines-1m)
