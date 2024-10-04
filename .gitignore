@@ -13,3 +13,6 @@ pom.xml
 .DS_Store
 /.vscode
 /dataset
+*.test
+*.train
+model.txt

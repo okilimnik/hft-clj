@@ -1,7 +1,8 @@
 (ns hft.core
   (:gen-class)
   (:require [clojure.tools.cli :refer [parse-opts]]
-            [hft.dataset :refer [range-market-pipeline trend-market-pipeline]])
+            ;[hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
+            [hft.model.lightgbm :as lightgbm])
   (:import [io.helidon.webserver WebServer]))
 
 (def cli-options
@@ -10,6 +11,8 @@
     :default 80
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
+   ["-t" nil "Train"
+    :id :train]
    ;; A non-idempotent option (:default is applied first)
    ["-v" nil "Verbosity level"
     :id :verbosity
@@ -36,7 +39,8 @@
       (do 
         
         (run-server))
-      (do
+      (:train options) (lightgbm/train!)
+      #_(do
         (println "market state is: " market-state)
         (case (keyword market-state)
           :range (range-market-pipeline)
