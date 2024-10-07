@@ -2,7 +2,8 @@
   (:gen-class)
   (:require [clojure.tools.cli :refer [parse-opts]]
             ;[hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
-            [hft.model.lightgbm :as lightgbm])
+            [hft.model.lightgbm :as lightgbm]
+            [hft.ui :as ui])
   (:import [io.helidon.webserver WebServer]))
 
 (def cli-options
@@ -13,6 +14,8 @@
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
    ["-t" nil "Train"
     :id :train]
+   ["-i" nil "UI"
+    :id :ui]
    ;; A non-idempotent option (:default is applied first)
    ["-v" nil "Verbosity level"
     :id :verbosity
@@ -36,14 +39,14 @@
 
     (cond
       (:order-book options)
-      (do 
-        
-        (run-server))
-      (:train options) (lightgbm/train!)
+      (do (run-server))
+      (:train options) (do (lightgbm/train!)
+                           (System/exit 0))
+      (:ui options) (ui/run!)
       #_(do
-        (println "market state is: " market-state)
-        (case (keyword market-state)
-          :range (range-market-pipeline)
-          :trend (trend-market-pipeline)
-          (prn (str "Handling " market-state " market is not implemented")))))))
+          (println "market state is: " market-state)
+          (case (keyword market-state)
+            :range (range-market-pipeline)
+            :trend (trend-market-pipeline)
+            (prn (str "Handling " market-state " market is not implemented")))))))
 
