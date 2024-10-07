@@ -29,3 +29,7 @@
     (.setDefaultItemLabelsVisible renderer false)
     (let [chart (JFreeChart. name JFreeChart/DEFAULT_TITLE_FONT combined-domain-plot true)]
       chart)))
+
+(defn ->image [chart filepath]
+  (let [image (.createBufferedImage chart 600 800)]
+    (i/save image filepath)))
