@@ -5,6 +5,7 @@
             [clojure.string :as str]
             [hft.chart :refer [->chart with-indicator] :as chart]
             [hft.gcloud :as gcloud]
+            [hft.image :as i]
             [hft.market.binance :as bi]
             [hft.scheduler :as scheduler])
   (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
@@ -16,6 +17,8 @@
 
 ;; ["BNBUSDT" "BTCUSDT" "ETHUSDT" "SOLUSDT" "PEPEUSDT" "NEIROUSDT" "DOGSUSDT" "WIFUSDT" "FETUSDT" "SAGAUSDT"]
 (def SYMBOL (or (System/getenv "SYMBOL") "BTCUSDT"))
+(def MAX-QUANTITY {"BTCUSDT" 100
+                   "BNBUSDT" 100})
 (def INPUT-SIZE 20)
 (def DATAFILE (str SYMBOL ".tsv"))
 (def PRICE-PERCENT-FOR-INDEXING 0.002)
@@ -59,7 +62,8 @@
 (defn open-order [price inputs chart]
   (reset! order {:price price
                  :inputs inputs
-                 :chart chart}))
+                 :chart chart
+                 :timestamp (System/currentTimeMillis)}))
 
 (defn ->tsv [label data]
   (let [qties (concat (mapcat :bids data)
@@ -77,11 +81,12 @@
                                          ["\n"])) :append true)))
 
 (defn close-order [price]
-  (if (>= (- price (:price @order)) (* price STOP-PROFIT-PRICE-PERCENT))
-    (do (->tsv 1 (:inputs @order))
-        (chart/->image (:chart @order) "1.png"))
-    (do (->tsv 0 (:inputs @order))
-        (chart/->image (:chart @order) "0.png")))
+  (let [label (if (>= (- price (:price @order)) (* price STOP-PROFIT-PRICE-PERCENT)) 1 0)]
+    (->tsv label (:inputs @order))
+    (chart/->image (:chart @order) (str "charts/chart_" (:timestamp @order) "_" label ".png"))
+    (let [image (i/->image {:data (:inputs @order)
+                            :max-value (get MAX-QUANTITY SYMBOL)})]
+      (i/save image (str "books/book_ " (:timestamp @order) "_" label ".png"))))
   (reset! order nil))
 
 (defn update-prices [book price-changes]
@@ -104,6 +109,7 @@
 (defn range-market-pipeline []
   (println "SYMBOL is: " SYMBOL)
   (.mkdirs (io/file "charts"))
+  (.mkdirs (io/file "books"))
   (let [;order-book (atom {:lastUpdateId 0 :bids (transient {})  :asks (transient {})})
         inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)
@@ -140,14 +146,14 @@
 
                                                   #_(= (:stream event) depth)
                                                   #_(if @order-book-warmed-up?
-                                                    (update-order-book order-book data)
-                                                    (do
-                                                      (swap! order-book-warming-buffer conj data)
-                                                      (when (> (count @order-book-warming-buffer) 10)
-                                                        (init-order-book! order-book)
-                                                        (doseq [buffered-data @order-book-warming-buffer]
-                                                          (update-order-book order-book buffered-data))
-                                                        (reset! order-book-warmed-up? true))))
+                                                      (update-order-book order-book data)
+                                                      (do
+                                                        (swap! order-book-warming-buffer conj data)
+                                                        (when (> (count @order-book-warming-buffer) 10)
+                                                          (init-order-book! order-book)
+                                                          (doseq [buffered-data @order-book-warming-buffer]
+                                                            (update-order-book order-book buffered-data))
+                                                          (reset! order-book-warmed-up? true))))
 
                                                   (and (= (:stream event) klines-1m)
                                                        ;; kline closed
@@ -231,6 +237,10 @@
               (prn "uploading data file")
               (gcloud/upload-file! f)))
           (doseq [f (file-seq (io/file "charts"))]
+            (when-not (.isDirectory f)
+              (gcloud/upload-file! f)
+              (.delete f)))
+          (doseq [f (file-seq (io/file "books"))]
             (when-not (.isDirectory f)
               (gcloud/upload-file! f)
               (.delete f)))))]))))
