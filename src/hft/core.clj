@@ -1,9 +1,8 @@
 (ns hft.core
   (:gen-class)
-  (:require [clojure.tools.cli :refer [parse-opts]]
-            ;[hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
-            [hft.model.lightgbm :as lightgbm]
-            [hft.ui :as ui])
+  (:require [clojure.tools.cli :refer [parse-opts]] ;[hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
+            [hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
+            [hft.model.lightgbm :as lightgbm])
   (:import [io.helidon.webserver WebServer]))
 
 (def cli-options
@@ -42,11 +41,11 @@
       (do (run-server))
       (:train options) (do (lightgbm/train!)
                            (System/exit 0))
-      (:ui options) (ui/run!)
-      #_(do
-          (println "market state is: " market-state)
-          (case (keyword market-state)
-            :range (range-market-pipeline)
-            :trend (trend-market-pipeline)
-            (prn (str "Handling " market-state " market is not implemented")))))))
+      :else
+      (do
+        (println "market state is: " market-state)
+        (case (keyword market-state)
+          :range (range-market-pipeline)
+          :trend (trend-market-pipeline)
+          (prn (str "Handling " market-state " market is not implemented")))))))
 

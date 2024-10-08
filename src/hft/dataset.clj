@@ -3,6 +3,7 @@
             [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.string :as str]
+            [hft.chart :refer [->chart with-indicator] :as chart]
             [hft.gcloud :as gcloud]
             [hft.market.binance :as bi]
             [hft.scheduler :as scheduler])
@@ -55,9 +56,10 @@
 
 (def order (atom nil))
 
-(defn open-order [price inputs]
+(defn open-order [price inputs chart]
   (reset! order {:price price
-                 :inputs inputs}))
+                 :inputs inputs
+                 :chart chart}))
 
 (defn ->tsv [label data]
   (let [qties (concat (mapcat :bids data)
@@ -76,8 +78,10 @@
 
 (defn close-order [price]
   (if (>= (- price (:price @order)) (* price STOP-PROFIT-PRICE-PERCENT))
-    (->tsv 1 (:inputs @order))
-    (->tsv 0 (:inputs @order)))
+    (do (->tsv 1 (:inputs @order))
+        (chart/->image (:chart @order) "1.png"))
+    (do (->tsv 0 (:inputs @order))
+        (chart/->image (:chart @order) "0.png")))
   (reset! order nil))
 
 (defn update-prices [book price-changes]
@@ -99,35 +103,34 @@
 
 (defn range-market-pipeline []
   (println "SYMBOL is: " SYMBOL)
-  (let [order-book (atom {:lastUpdateId 0
-                          :bids (transient {})
-                          :asks (transient {})})
+  (.mkdirs (io/file "charts"))
+  (let [;order-book (atom {:lastUpdateId 0 :bids (transient {})  :asks (transient {})})
         inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)
         klines (atom clojure.lang.PersistentQueue/EMPTY)]
     (<!!
      (a/merge
-      [#_(scheduler/start!
-          6000
-          (fn []
-            (let [order-book (bi/depth! SYMBOL 5000)]
-              (swap! max-bids #(as-> % $
-                                 (conj $ (parse-double (ffirst (:bids order-book))))
-                                 (if (> (count $) INPUT-SIZE)
-                                   (pop $)
-                                   $)))
-              (swap! inputs #(as-> % $
-                               (conj $ (order-book->quantities-indexed-by-price-level order-book (apply max @max-bids)))
+      [(scheduler/start!
+        6000
+        (fn []
+          (let [order-book (bi/depth! SYMBOL 5000)]
+            (swap! max-bids #(as-> % $
+                               (conj $ (parse-double (ffirst (:bids order-book))))
                                (if (> (count $) INPUT-SIZE)
                                  (pop $)
-                                 $))))))
+                                 $)))
+            (swap! inputs #(as-> % $
+                             (conj $ (order-book->quantities-indexed-by-price-level order-book (apply max @max-bids)))
+                             (if (> (count $) INPUT-SIZE)
+                               (pop $)
+                               $))))))
        (thread
-         (init-order-book! order-book)
+         ;(init-order-book! order-book)
          (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")
                depth (str (str/lower-case SYMBOL) "@depth")
                order-book-warming-buffer (atom (transient []))
                order-book-warmed-up? (atom false)]
-           (bi/subscribe [klines-1m depth]
+           (bi/subscribe [klines-1m]
                          (reify WebSocketMessageCallback
                            ^void (onMessage [_ event-str]
                                             (try
@@ -135,8 +138,8 @@
                                                     data (:data event)]
                                                 (cond
 
-                                                  (= (:stream event) depth)
-                                                  (if @order-book-warmed-up?
+                                                  #_(= (:stream event) depth)
+                                                  #_(if @order-book-warmed-up?
                                                     (update-order-book order-book data)
                                                     (do
                                                       (swap! order-book-warming-buffer conj data)
@@ -190,7 +193,10 @@
                                                               buy-signal?
                                                               (do (prn "buy signal")
                                                                   (when-not @order
-                                                                    (open-order price @inputs)))
+                                                                    (let [chart (-> (->chart "Buy signal" @klines)
+                                                                                    (with-indicator chikou :overlay :line)
+                                                                                    (with-indicator kijun :overlay :line))]
+                                                                      (open-order price @inputs chart))))
 
                                                               sell-signal?
                                                               (do (prn "sell signal")
@@ -213,8 +219,7 @@
                                                                 (and (< psar-value (:l (nth @klines curr-index)))
                                                                      (> adx-value TREND-STRENGTH-THRESHOLD))
                                                                 (do (prn "buy signal")
-                                                                    (open-order (:c (nth @klines curr-index)) @inputs))))))))
-                                                  (prn "Not implemented")))
+                                                                    (open-order (:c (nth @klines curr-index)) @inputs))))))))))
                                               (catch Exception e (prn e))))))))
 
        (scheduler/start!
@@ -224,7 +229,11 @@
             (prn "checking data file")
             (when (.exists f)
               (prn "uploading data file")
-              (gcloud/upload-file! f)))))]))))
+              (gcloud/upload-file! f)))
+          (doseq [f (file-seq (io/file "charts"))]
+            (when-not (.isDirectory f)
+              (gcloud/upload-file! f)
+              (.delete f)))))]))))
 
 (defn trend-market-pipeline []
   (println "SYMBOL is: " SYMBOL))

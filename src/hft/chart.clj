@@ -38,6 +38,18 @@
     (.addSeries collection timeseries)
     collection))
 
+(defmethod convert [Indicator String] [indicator name]
+  (let [collection (TimeSeriesCollection.)
+        timeseries (TimeSeries. name)
+        bar-series (.getBarSeries indicator)]
+    (dotimes [i (.getBarCount (.getBarSeries indicator))]
+      (let [bar (.getBar bar-series i)
+            value (.doubleValue (.getValue indicator i))
+            time (Second. (Date. (* 1000 (.toEpochSecond (.getEndTime bar)))))]
+        (.add timeseries time value)))
+    (.addSeries collection timeseries)
+    collection))
+
 (defn ->chart [name klines]
   (let [time-axis (DateAxis. "Time")
         value-axis (NumberAxis. "Price/Value")
@@ -65,25 +77,36 @@
     (.setSeriesPaint 0 color)
     (.setShadowVisible false)))
 
+(defn get-indicator-color [name]
+  (case name
+    "IchimokuChikouSpanIndicator" Color/GREEN
+    "IchimokuKijunSenIndicator" Color/RED
+    Color/BLACK))
+
 (defn with-indicator [chart indicator plot-type chart-type]
   (let [plot (.getPlot chart)
         counter (.getBarCount (.getBarSeries indicator))
-        name (.toString indicator)]
+        name (.toString indicator)
+        color (get-indicator-color name)]
     (cond
       (= plot-type :overlay) (cond
                                (= chart-type :line)
                                (let [timeseries (convert indicator name)
-                                     renderer (create-line-renderer Color/RED)
+                                     renderer (create-line-renderer color)
                                      candlestick-plot (.get (.getSubplots plot) 0)]
                                  (.setRenderer candlestick-plot counter renderer)
                                  (.setDataset candlestick-plot counter timeseries))
 
                                (= chart-type :bar)
-                               "Not implemented")
+                               (let [bar-dataset (convert indicator name)
+                                     renderer (create-bar-renderer color)
+                                     candlestick-plot (.get (.getSubplots plot) 0)]
+                                 (.setRenderer candlestick-plot counter renderer)
+                                 (.setDataset candlestick-plot counter bar-dataset)))
       (= plot-type :subplot) (cond
                                (= chart-type :line)
                                (let [timeseries (convert indicator name)
-                                     renderer (create-line-renderer Color/RED)
+                                     renderer (create-line-renderer color)
                                      value-axis (NumberAxis. name)
                                      line-plot (XYPlot. timeseries nil value-axis renderer)]
                                  (.setLabel value-axis "")
@@ -93,7 +116,7 @@
                                (= chart-type :bar)
                                (let [bar-dataset (convert indicator name)
                                      value-axis (NumberAxis. name)
-                                     bar-renderer (create-bar-renderer Color/GRAY)
+                                     bar-renderer (create-bar-renderer color)
                                      bar-plot (XYPlot. bar-dataset nil value-axis bar-renderer)]
                                  (.setLabel value-axis "")
                                  (.add plot bar-plot 1)))))
