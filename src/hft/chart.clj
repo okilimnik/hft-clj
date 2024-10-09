@@ -18,7 +18,7 @@
 
 (defmethod convert :raw [_ klines name]
   (DefaultHighLowDataset. name
-                          (into-array (map :t klines))
+                          (into-array (Date. (map :t klines)))
                           (into-array (map :h klines))
                           (into-array (map :l klines))
                           (into-array (map :o klines))
