@@ -12,12 +12,11 @@
             XYBarRenderer
             XYLineAndShapeRenderer]
            [org.jfree.data.time Second TimeSeries TimeSeriesCollection]
-           [org.jfree.data.xy DefaultHighLowDataset]
-           [org.ta4j.core Indicator]))
+           [org.jfree.data.xy DefaultHighLowDataset]))
 
-(defmulti convert class)
+(defmulti convert (fn [kind & _args] kind))
 
-(defmethod convert [::collection String] [klines name]
+(defmethod convert :raw [_ klines name]
   (DefaultHighLowDataset. name
                           (into-array (map :t klines))
                           (into-array (map :h klines))
@@ -26,7 +25,7 @@
                           (into-array (map :c klines))
                           (into-array (map :v klines))))
 
-(defmethod convert [Indicator String] [indicator name]
+(defmethod convert :line [_ indicator name]
   (let [collection (TimeSeriesCollection.)
         timeseries (TimeSeries. name)
         bar-series (.getBarSeries indicator)]
@@ -38,7 +37,7 @@
     (.addSeries collection timeseries)
     collection))
 
-(defmethod convert [Indicator String] [indicator name]
+(defmethod convert :bar [_ indicator name]
   (let [collection (TimeSeriesCollection.)
         timeseries (TimeSeries. name)
         bar-series (.getBarSeries indicator)]
@@ -54,7 +53,7 @@
   (let [time-axis (DateAxis. "Time")
         value-axis (NumberAxis. "Price/Value")
         renderer (CandlestickRenderer.)
-        bar-series-data (convert klines name)
+        bar-series-data (convert :raw klines name)
         plot (XYPlot. bar-series-data nil value-axis renderer)
         combined-domain-plot (CombinedDomainXYPlot. time-axis)]
     (.add combined-domain-plot plot 10)
@@ -91,21 +90,21 @@
     (cond
       (= plot-type :overlay) (cond
                                (= chart-type :line)
-                               (let [timeseries (convert indicator name)
+                               (let [timeseries (convert :line indicator name)
                                      renderer (create-line-renderer color)
                                      candlestick-plot (.get (.getSubplots plot) 0)]
                                  (.setRenderer candlestick-plot counter renderer)
                                  (.setDataset candlestick-plot counter timeseries))
 
                                (= chart-type :bar)
-                               (let [bar-dataset (convert indicator name)
+                               (let [bar-dataset (convert :bar indicator name)
                                      renderer (create-bar-renderer color)
                                      candlestick-plot (.get (.getSubplots plot) 0)]
                                  (.setRenderer candlestick-plot counter renderer)
                                  (.setDataset candlestick-plot counter bar-dataset)))
       (= plot-type :subplot) (cond
                                (= chart-type :line)
-                               (let [timeseries (convert indicator name)
+                               (let [timeseries (convert :line indicator name)
                                      renderer (create-line-renderer color)
                                      value-axis (NumberAxis. name)
                                      line-plot (XYPlot. timeseries nil value-axis renderer)]
@@ -114,7 +113,7 @@
                                  (.add plot line-plot 1))
 
                                (= chart-type :bar)
-                               (let [bar-dataset (convert indicator name)
+                               (let [bar-dataset (convert :bar indicator name)
                                      value-axis (NumberAxis. name)
                                      bar-renderer (create-bar-renderer color)
                                      bar-plot (XYPlot. bar-dataset nil value-axis bar-renderer)]

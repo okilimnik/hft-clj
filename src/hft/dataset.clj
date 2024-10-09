@@ -81,12 +81,13 @@
                                          ["\n"])) :append true)))
 
 (defn close-order [price]
-  (let [label (if (>= (- price (:price @order)) (* price STOP-PROFIT-PRICE-PERCENT)) 1 0)]
+  (let [label (if (>= (- price (:price @order)) (* price STOP-PROFIT-PRICE-PERCENT)) 1 0)
+        suffix (str (:timestamp @order) "_" label "_" price ".png")]
     (->tsv label (:inputs @order))
-    (chart/->image (:chart @order) (str "charts/chart_" (:timestamp @order) "_" label ".png"))
+    (chart/->image (:chart @order) (str "charts/chart_" suffix))
     (let [image (i/->image {:data (:inputs @order)
                             :max-value (get MAX-QUANTITY SYMBOL)})]
-      (i/save image (str "books/book_ " (:timestamp @order) "_" label ".png"))))
+      (i/save image (str "books/book_ " suffix))))
   (reset! order nil))
 
 (defn update-prices [book price-changes]
