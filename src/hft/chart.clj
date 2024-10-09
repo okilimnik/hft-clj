@@ -19,11 +19,11 @@
 (defmethod convert :raw [_ klines name]
   (DefaultHighLowDataset. name
                           (into-array (map #(Date. (:t %))  klines))
-                          (into-array (map :h klines))
-                          (into-array (map :l klines))
-                          (into-array (map :o klines))
-                          (into-array (map :c klines))
-                          (into-array (map :v klines))))
+                          (double-array (map :h klines))
+                          (double-array (map :l klines))
+                          (double-array (map :o klines))
+                          (double-array (map :c klines))
+                          (double-array (map :v klines))))
 
 (defmethod convert :line [_ indicator name]
   (let [collection (TimeSeriesCollection.)
