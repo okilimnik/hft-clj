@@ -60,7 +60,7 @@
     (.setAutoRangeIncludesZero value-axis false)
     (.setAutoWidthMethod renderer 1)
     (.setDrawVolume renderer false)
-    (.setDefaultItemLabelsVisible renderer false)
+    (.setDefaultItemLabelsVisible renderer false false)
     (let [chart (JFreeChart. name JFreeChart/DEFAULT_TITLE_FONT combined-domain-plot true)]
       chart)))
 
