@@ -107,6 +107,15 @@
   (let [data (bi/depth! SYMBOL 5000)]
     (update-order-book order-book (set/rename-keys data {:asks :a :bids :b :lastUpdateId :u}))))
 
+(defn klines->series [name klines]
+  (let [series (BaseBarSeries. name)]
+    (doseq [{:keys [o h l c t v n]} klines]
+      (let [date (ZonedDateTime/ofInstant
+                  (Instant/ofEpochMilli t)
+                  (ZoneId/systemDefault))]
+        (.addBar ^BarSeries series date o h l c v n)))
+    series))
+
 (defn range-market-pipeline []
   (println "SYMBOL is: " SYMBOL)
   (.mkdirs (io/file "charts"))
@@ -178,55 +187,49 @@
                                                          ;; closing with loss
                                                         (close-order price))
                                                       (when (>= (count @klines) KLINES-SERIES-LENGTH) ;; warmed-up
+                                                        (let [series (klines->series "1m" @klines)
+                                                              chikou (IchimokuChikouSpanIndicator. series ICHIMOKU-PERIOD)
+                                                              kijun (IchimokuKijunSenIndicator. series ICHIMOKU-PERIOD)
+                                                              close-prices (ClosePriceIndicator. series)
+                                                              buy-rule (CrossedUpIndicatorRule. chikou close-prices)
 
-                                                        (let [series (BaseBarSeries. "1m")]
-                                                          (doseq [{:keys [o h l c t v n]} @klines]
-                                                            (let [date (ZonedDateTime/ofInstant
-                                                                        (Instant/ofEpochMilli t)
-                                                                        (ZoneId/systemDefault))]
-                                                              (.addBar ^BarSeries series date o h l c v n)))
-                                                          (let [chikou (IchimokuChikouSpanIndicator. series ICHIMOKU-PERIOD)
-                                                                kijun (IchimokuKijunSenIndicator. series ICHIMOKU-PERIOD)
-                                                                close-prices (ClosePriceIndicator. series)
-                                                                buy-rule (CrossedUpIndicatorRule. chikou close-prices)
+                                                              buy-signal? (.isSatisfied buy-rule (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
+                                                              sell-rule-1 (CrossedUpIndicatorRule. kijun close-prices)
+                                                              sell-rule-2 (CrossedDownIndicatorRule. chikou close-prices)
+                                                              sell-signal? (or (.isSatisfied sell-rule-1 (dec KLINES-SERIES-LENGTH) nil)
+                                                                               (.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil))]
 
-                                                                buy-signal? (.isSatisfied buy-rule (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
-                                                                sell-rule-1 (CrossedUpIndicatorRule. kijun close-prices)
-                                                                sell-rule-2 (CrossedDownIndicatorRule. chikou close-prices)
-                                                                sell-signal? (or (.isSatisfied sell-rule-1 (dec KLINES-SERIES-LENGTH) nil)
-                                                                                 (.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil))]
+                                                          (cond
+                                                            buy-signal?
+                                                            (do (prn "buy signal")
+                                                                (when-not @order
+                                                                  (let [chart (-> (->chart "Buy signal" @klines)
+                                                                                  (with-indicator chikou :overlay :line)
+                                                                                  (with-indicator kijun :overlay :line))]
+                                                                    (open-order price @inputs chart))))
 
-                                                            (cond
-                                                              buy-signal?
-                                                              (do (prn "buy signal")
-                                                                  (when-not @order
-                                                                    (let [chart (-> (->chart "Buy signal" @klines)
-                                                                                    (with-indicator chikou :overlay :line)
-                                                                                    (with-indicator kijun :overlay :line))]
-                                                                      (open-order price @inputs chart))))
-
-                                                              sell-signal?
-                                                              (do (prn "sell signal")
-                                                                  (when @order
-                                                                    (close-order price)))))
+                                                            sell-signal?
+                                                            (do (prn "sell signal")
+                                                                (when @order
+                                                                  (close-order price)))))
 
                                                          ;; logic for trend market
-                                                          #_(let [psar (ParabolicSarIndicator. series)
-                                                                  adx (ADXIndicator. series INPUT-SIZE)
-                                                                  curr-index (dec KLINES-SERIES-LENGTH)
-                                                                  adx-value (.longValue (.getValue adx curr-index))
-                                                                  psar-value (.doubleValue (.getValue psar curr-index))]
-                                                              (cond
-                                                                (> psar-value (:h (nth @klines curr-index)))
-                                                                (do (prn "sell signal")
-                                                                    (when @order
-                                                                      (close-order (:c (nth @klines curr-index))))
-                                                                    #_(->> @inputs
-                                                                           save!))
-                                                                (and (< psar-value (:l (nth @klines curr-index)))
-                                                                     (> adx-value TREND-STRENGTH-THRESHOLD))
-                                                                (do (prn "buy signal")
-                                                                    (open-order (:c (nth @klines curr-index)) @inputs))))))))))
+                                                        #_(let [psar (ParabolicSarIndicator. series)
+                                                                adx (ADXIndicator. series INPUT-SIZE)
+                                                                curr-index (dec KLINES-SERIES-LENGTH)
+                                                                adx-value (.longValue (.getValue adx curr-index))
+                                                                psar-value (.doubleValue (.getValue psar curr-index))]
+                                                            (cond
+                                                              (> psar-value (:h (nth @klines curr-index)))
+                                                              (do (prn "sell signal")
+                                                                  (when @order
+                                                                    (close-order (:c (nth @klines curr-index))))
+                                                                  #_(->> @inputs
+                                                                         save!))
+                                                              (and (< psar-value (:l (nth @klines curr-index)))
+                                                                   (> adx-value TREND-STRENGTH-THRESHOLD))
+                                                              (do (prn "buy signal")
+                                                                  (open-order (:c (nth @klines curr-index)) @inputs)))))))))
                                               (catch Exception e (prn e))))))))
 
        (scheduler/start!
