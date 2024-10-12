@@ -1,5 +1,6 @@
 (ns hft.chart-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer [deftest is]]
             [hft.chart :as sut]
             [hft.dataset :as dataset]) 
   (:import [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator]))
@@ -13,11 +14,17 @@
                :n 100
                :t (System/currentTimeMillis)}
         klines (->> (take 50 (repeat kline))
-                    (map-indexed #(update %2 :t + (* %1 1000)))
+                    (map-indexed #(-> (update %2 :t + (* %1 1000))
+                                      (update :o inc)
+                                      (update :h inc)
+                                      (update :l inc)
+                                      (update :c inc)
+                                      (update :v inc)))
                     vec)
         series (dataset/klines->series "1m" klines)]
-    (is (= :ok (try (-> (sut/->chart "Buy signal" klines)
-                        (sut/with-indicator (IchimokuKijunSenIndicator. series 50) :overlay :line)
-                        (sut/with-indicator  (IchimokuChikouSpanIndicator. series 50) :overlay :line))
-                    :ok
-                    (catch Exception e e))))))
+    (-> (sut/->chart "Buy signal" klines)
+        (sut/with-indicator (IchimokuKijunSenIndicator. series 50) :overlay :line 3)
+        (sut/with-indicator (IchimokuChikouSpanIndicator. series 50) :overlay :line 4)
+        (sut/->image "chart.png"))
+    (is (= true (.exists (io/file "chart.png"))))
+    (.delete (io/file "chart.png"))))

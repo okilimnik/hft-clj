@@ -14,6 +14,8 @@
            [org.jfree.data.time Second TimeSeries TimeSeriesCollection]
            [org.jfree.data.xy DefaultHighLowDataset]))
 
+(def overlay-ids (atom 2))
+
 (defmulti convert (fn [kind & _args] kind))
 
 (defmethod convert :raw [_ klines name]
@@ -81,11 +83,11 @@
     "IchimokuKijunSenIndicator" Color/RED
     Color/BLACK))
 
-(defn with-indicator [chart indicator plot-type chart-type]
+(defn with-indicator [chart indicator plot-type chart-type overlay-id]
   (let [plot (.getPlot chart)
-        counter (.getBarCount (.getBarSeries indicator))
         name (.toString indicator)
-        color (get-indicator-color name)]
+        color (get-indicator-color name)
+        counter (+ overlay-id 2)] ;; 0 = ohlcv data, 1 = volume data
     (cond
       (= plot-type :overlay) (cond
                                (= chart-type :line)

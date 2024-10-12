@@ -204,8 +204,8 @@
                                                             (do (prn "buy signal")
                                                                 (when-not @order
                                                                   (let [chart (-> (->chart "Buy signal" @klines)
-                                                                                  (with-indicator chikou :overlay :line)
-                                                                                  (with-indicator kijun :overlay :line))]
+                                                                                  (with-indicator chikou :overlay :line 0)
+                                                                                  (with-indicator kijun :overlay :line 1))]
                                                                     (open-order price @inputs chart))))
 
                                                             sell-signal?
