@@ -23,8 +23,8 @@
                     vec)
         series (dataset/klines->series "1m" klines)]
     (-> (sut/->chart "Buy signal" klines)
-        (sut/with-indicator (IchimokuKijunSenIndicator. series 50) :overlay :line 3)
-        (sut/with-indicator (IchimokuChikouSpanIndicator. series 50) :overlay :line 4)
+        (sut/with-indicator (IchimokuKijunSenIndicator. series 50) :overlay :line 0)
+        (sut/with-indicator (IchimokuChikouSpanIndicator. series 50) :overlay :line 1)
         (sut/->image "chart.png"))
     (is (= true (.exists (io/file "chart.png"))))
     (.delete (io/file "chart.png"))))

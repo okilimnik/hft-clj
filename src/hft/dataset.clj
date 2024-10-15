@@ -191,11 +191,11 @@
                                                               chikou (IchimokuChikouSpanIndicator. series ICHIMOKU-PERIOD)
                                                               kijun (IchimokuKijunSenIndicator. series ICHIMOKU-PERIOD)
                                                               close-prices (ClosePriceIndicator. series)
-                                                              buy-rule (CrossedUpIndicatorRule. chikou close-prices)
+                                                              buy-rule (CrossedDownIndicatorRule. chikou close-prices)
 
                                                               buy-signal? (.isSatisfied buy-rule (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
-                                                              sell-rule-1 (CrossedUpIndicatorRule. kijun close-prices)
-                                                              sell-rule-2 (CrossedDownIndicatorRule. chikou close-prices)
+                                                              sell-rule-1 (CrossedDownIndicatorRule. kijun close-prices)
+                                                              sell-rule-2 ( CrossedUpIndicatorRule. chikou close-prices)
                                                               sell-signal? (or (.isSatisfied sell-rule-1 (dec KLINES-SERIES-LENGTH) nil)
                                                                                (.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil))]
 
