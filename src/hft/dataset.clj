@@ -12,8 +12,8 @@
            [java.time Instant ZoneId ZonedDateTime]
            [org.ta4j.core BarSeries BaseBarSeries]
            [org.ta4j.core.indicators.helpers ClosePriceIndicator]
-           [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator]
-           [org.ta4j.core.rules CrossedDownIndicatorRule CrossedUpIndicatorRule]))
+           [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator IchimokuTenkanSenIndicator]
+           [org.ta4j.core.rules CrossedDownIndicatorRule CrossedUpIndicatorRule IsRisingRule]))
 
 ;; ["BNBUSDT" "BTCUSDT" "ETHUSDT" "SOLUSDT" "PEPEUSDT" "NEIROUSDT" "DOGSUSDT" "WIFUSDT" "FETUSDT" "SAGAUSDT"]
 (def SYMBOL (or (System/getenv "SYMBOL") "BTCUSDT"))
@@ -190,12 +190,15 @@
                                                         (let [series (klines->series "1m" @klines)
                                                               chikou (IchimokuChikouSpanIndicator. series ICHIMOKU-PERIOD)
                                                               kijun (IchimokuKijunSenIndicator. series ICHIMOKU-PERIOD)
+                                                              tenkan (IchimokuTenkanSenIndicator. series 9)
                                                               close-prices (ClosePriceIndicator. series)
-                                                              buy-rule (CrossedDownIndicatorRule. chikou close-prices)
+                                                              buy-rule-1 (CrossedDownIndicatorRule. chikou close-prices)
+                                                              buy-rule-2 (IsRisingRule. tenkan 2)
 
-                                                              buy-signal? (.isSatisfied buy-rule (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
+                                                              buy-signal? (and (.isSatisfied buy-rule-1 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
+                                                                               (.isSatisfied buy-rule-2 (dec KLINES-SERIES-LENGTH) nil))
                                                               sell-rule-1 (CrossedDownIndicatorRule. kijun close-prices)
-                                                              sell-rule-2 ( CrossedUpIndicatorRule. chikou close-prices)
+                                                              sell-rule-2 (CrossedUpIndicatorRule. chikou close-prices)
                                                               sell-signal? (or (.isSatisfied sell-rule-1 (dec KLINES-SERIES-LENGTH) nil)
                                                                                (.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil))]
 
