@@ -195,12 +195,21 @@
                                                               buy-rule-1 (CrossedDownIndicatorRule. chikou close-prices)
                                                               buy-rule-2 (IsRisingRule. tenkan 2)
 
-                                                              buy-signal? (and (.isSatisfied buy-rule-1 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
-                                                                               (.isSatisfied buy-rule-2 (dec KLINES-SERIES-LENGTH) nil))
+                                                              buy-signal? (and
+                                                                           ;; chikou just has crossed the prices
+                                                                           (.isSatisfied buy-rule-1 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
+                                                                           (not (.isSatisfied buy-rule-1 (dec (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD)) nil))
+                                                                           ;; it's trendy now
+                                                                           (.isSatisfied buy-rule-2 (dec KLINES-SERIES-LENGTH) nil))
                                                               sell-rule-1 (CrossedDownIndicatorRule. kijun close-prices)
                                                               sell-rule-2 (CrossedUpIndicatorRule. chikou close-prices)
-                                                              sell-signal? (or (.isSatisfied sell-rule-1 (dec KLINES-SERIES-LENGTH) nil)
-                                                                               (.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil))]
+                                                              sell-signal? (or
+                                                                            ;; kijun just has crossed the prices
+                                                                            (.isSatisfied sell-rule-1 (dec KLINES-SERIES-LENGTH) nil)
+                                                                            (not (.isSatisfied sell-rule-1 (dec (dec KLINES-SERIES-LENGTH)) nil))
+                                                                            ;; chikou just has crossed the prices
+                                                                            (.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
+                                                                            (not (.isSatisfied sell-rule-2 (dec (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD)) nil)))]
 
                                                           (cond
                                                             buy-signal?
@@ -208,7 +217,8 @@
                                                                 (when-not @order
                                                                   (let [chart (-> (->chart "Buy signal" @klines)
                                                                                   (with-indicator chikou :overlay :line 0)
-                                                                                  (with-indicator kijun :overlay :line 1))]
+                                                                                  (with-indicator kijun :overlay :line 1)
+                                                                                  (with-indicator tenkan :overlay :line 2))]
                                                                     (open-order price @inputs chart))))
 
                                                             sell-signal?

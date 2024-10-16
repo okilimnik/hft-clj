@@ -81,6 +81,7 @@
   (case name
     "IchimokuChikouSpanIndicator" Color/GREEN
     "IchimokuKijunSenIndicator" Color/RED
+    "IchimokuTenkanSenIndicator" Color/BLUE
     Color/BLACK))
 
 (defn with-indicator [chart indicator plot-type chart-type overlay-id]
