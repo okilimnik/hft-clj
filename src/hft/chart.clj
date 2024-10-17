@@ -14,8 +14,6 @@
            [org.jfree.data.time Second TimeSeries TimeSeriesCollection]
            [org.jfree.data.xy DefaultHighLowDataset]))
 
-(def overlay-ids (atom 2))
-
 (defmulti convert (fn [kind & _args] kind))
 
 (defmethod convert :raw [_ klines name]
