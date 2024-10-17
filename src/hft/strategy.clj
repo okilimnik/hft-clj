@@ -6,7 +6,7 @@
            [org.ta4j.core BarSeries BaseBarSeries]
            [org.ta4j.core.indicators.helpers ClosePriceIndicator HighPriceIndicator]
            [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator IchimokuTenkanSenIndicator]
-           [org.ta4j.core.rules CrossedDownIndicatorRule IsRisingRule]))
+           [org.ta4j.core.rules CrossedDownIndicatorRule CrossedUpIndicatorRule IsRisingRule]))
 
 (def order (atom nil))
 (def SYMBOL (or (System/getenv "SYMBOL") "BTCUSDT"))
@@ -73,25 +73,31 @@
             tenkan (IchimokuTenkanSenIndicator. series 9)
             close-prices (ClosePriceIndicator. series)
             high-prices (HighPriceIndicator. series)
+            
             buy-rule-1 (CrossedDownIndicatorRule. chikou high-prices)
             buy-rule-2 (IsRisingRule. tenkan 2)
 
             buy-signal? (and
+
                         ;; chikou just has crossed the prices
                          (.isSatisfied buy-rule-1 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
                          (not (.isSatisfied buy-rule-1 (dec (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD)) nil))
 
                          ;; it's trendy now
-                         #_(.isSatisfied buy-rule-2 (dec KLINES-SERIES-LENGTH) nil))
+                         (.isSatisfied buy-rule-2 (dec KLINES-SERIES-LENGTH) nil))
+
             sell-rule-1 (CrossedDownIndicatorRule. tenkan close-prices)
-                                                                ;sell-rule-2 (CrossedUpIndicatorRule. chikou close-prices)
+            sell-rule-2 (CrossedUpIndicatorRule. chikou close-prices)
+            
             sell-signal? (or
-                                                                              ;; kijun just has crossed the prices
+                          
+                          ;; kijun just has crossed the prices
                           (.isSatisfied sell-rule-1 (dec KLINES-SERIES-LENGTH) nil)
                           (not (.isSatisfied sell-rule-1 (dec (dec KLINES-SERIES-LENGTH)) nil))
-                                                                              ;; chikou just has crossed the prices
-                          #_(.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
-                          #_(not (.isSatisfied sell-rule-2 (dec (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD)) nil)))]
+
+                          ;; chikou just has crossed the prices
+                          (.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
+                          (not (.isSatisfied sell-rule-2 (dec (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD)) nil)))]
 
         (cond
           buy-signal?
