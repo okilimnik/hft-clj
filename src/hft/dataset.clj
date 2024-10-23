@@ -43,29 +43,11 @@
     {:bids bids
      :asks asks}))
 
-(defn update-prices [book price-changes]
-  (doseq [[price volume] price-changes]
-    (if (> (parse-double volume) 1)
-      (assoc! book price volume)
-      (dissoc! book price))))
-
-(defn update-order-book [order-book data]
-  (when (> (:u data) (:lastUpdateId @order-book))
-    (swap! order-book #(-> %
-                           (assoc :lastUpdateId (:u data))
-                           (update :bids (fn [bids] (update-prices bids (:b data))))
-                           (update :asks (fn [asks] (update-prices asks (:a data))))))))
-
-(defn init-order-book! [order-book]
-  (let [data (bi/depth! SYMBOL 5000)]
-    (update-order-book order-book (set/rename-keys data {:asks :a :bids :b :lastUpdateId :u}))))
-
 (defn range-market-pipeline []
   (println "SYMBOL is: " SYMBOL)
   (.mkdirs (io/file "charts"))
   (.mkdirs (io/file "books"))
-  (let [;order-book (atom {:lastUpdateId 0 :bids (transient {})  :asks (transient {})})
-        inputs (atom clojure.lang.PersistentQueue/EMPTY)
+  (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)
         klines (atom clojure.lang.PersistentQueue/EMPTY)]
     (<!!
@@ -85,11 +67,7 @@
                                (pop $)
                                $))))))
        (thread
-         ;(init-order-book! order-book)
-         (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")
-               depth (str (str/lower-case SYMBOL) "@depth")
-               order-book-warming-buffer (atom (transient []))
-               order-book-warmed-up? (atom false)]
+         (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")]
            (bi/subscribe [klines-1m]
                          (reify WebSocketMessageCallback
                            ^void (onMessage [_ event-str]

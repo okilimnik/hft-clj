@@ -60,13 +60,13 @@
   (reset! order nil))
 
 (defn trade! [{:keys [klines inputs]}]
-  (let [price (:c (last @klines))]
+  (let [price (:c (last klines))]
     (when (and @order
                (>= (- (:price @order) price)
                    (* price STOP-LOSS-PRICE-PERCENT)))
       ;; closing with loss
       (close-order price))
-    (when (>= (count @klines) KLINES-SERIES-LENGTH) ;; warmed-up
+    (when (>= (count klines) KLINES-SERIES-LENGTH) ;; warmed-up
       (let [series (klines->series "1m" klines)
             chikou (IchimokuChikouSpanIndicator. series ICHIMOKU-PERIOD)
             kijun (IchimokuKijunSenIndicator. series ICHIMOKU-PERIOD)
