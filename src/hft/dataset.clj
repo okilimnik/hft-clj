@@ -96,7 +96,7 @@
                                               (catch Exception e (prn e))))))))
 
        (scheduler/start!
-        (* 3 60 60 1000) ;; every 3 hour
+        (* 1 60 60 1000) ;; every 1 hour
         (fn []
           (let [f (io/file DATAFILE)]
             (prn "checking data file")
