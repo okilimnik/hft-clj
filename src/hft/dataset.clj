@@ -76,17 +76,6 @@
                                                     data (:data event)]
                                                 (cond
 
-                                                  #_(= (:stream event) depth)
-                                                  #_(if @order-book-warmed-up?
-                                                      (update-order-book order-book data)
-                                                      (do
-                                                        (swap! order-book-warming-buffer conj data)
-                                                        (when (> (count @order-book-warming-buffer) 10)
-                                                          (init-order-book! order-book)
-                                                          (doseq [buffered-data @order-book-warming-buffer]
-                                                            (update-order-book order-book buffered-data))
-                                                          (reset! order-book-warmed-up? true))))
-
                                                   (and (= (:stream event) klines-1m)
                                                        ;; kline closed
                                                        (:x (:k data)))

@@ -73,31 +73,23 @@
             tenkan (IchimokuTenkanSenIndicator. series 9)
             close-prices (ClosePriceIndicator. series)
             high-prices (HighPriceIndicator. series)
-            
-            buy-rule-1 (CrossedDownIndicatorRule. chikou high-prices)
-            buy-rule-2 (IsRisingRule. tenkan 2)
-
-            buy-signal? (and
-
-                        ;; chikou just has crossed the prices
-                         (.isSatisfied buy-rule-1 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
-                         (not (.isSatisfied buy-rule-1 (dec (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD)) nil))
-
-                         ;; it's trendy now
-                         (.isSatisfied buy-rule-2 (dec KLINES-SERIES-LENGTH) nil))
-
-            sell-rule-1 (CrossedDownIndicatorRule. tenkan close-prices)
-            sell-rule-2 (CrossedUpIndicatorRule. chikou close-prices)
-            
+                        ;; chikou just has crossed the prices up
+            buy-signal? (and (> (.doubleValue (.getValue chikou (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD)))
+                                (.doubleValue (.getValue high-prices (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD))))
+                             (< (.doubleValue (.getValue chikou (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1)))
+                                (.doubleValue (.getValue high-prices (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1)))))
+           ; buy-rule-2 (IsRisingRule. tenkan 2)
             sell-signal? (or
-                          
-                          ;; kijun just has crossed the prices
-                          (.isSatisfied sell-rule-1 (dec KLINES-SERIES-LENGTH) nil)
-                          (not (.isSatisfied sell-rule-1 (dec (dec KLINES-SERIES-LENGTH)) nil))
-
-                          ;; chikou just has crossed the prices
-                          (.isSatisfied sell-rule-2 (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD) nil)
-                          (not (.isSatisfied sell-rule-2 (dec (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD)) nil)))]
+                          ;; kijun just has crossed the prices up
+                          (and (> (.doubleValue (.getValue kijun (dec KLINES-SERIES-LENGTH)))
+                                  (.doubleValue (.getValue high-prices (dec KLINES-SERIES-LENGTH))))
+                               (< (.doubleValue (.getValue kijun (dec (dec KLINES-SERIES-LENGTH))))
+                                  (.doubleValue (.getValue high-prices (dec (dec KLINES-SERIES-LENGTH))))))
+                          ;; chikou just has crossed the prices down
+                          (and (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD)))
+                                  (.doubleValue (.getValue close-prices (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD))))
+                               (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD 1)))
+                                  (.doubleValue (.getValue close-prices (- KLINES-SERIES-LENGTH ICHIMOKU-PERIOD 1))))))]
 
         (cond
           buy-signal?
