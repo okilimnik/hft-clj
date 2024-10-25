@@ -1,11 +1,13 @@
 (ns hft.chart-test
-  (:require [clojure.java.io :as io]
-            [clojure.test :refer [deftest is]]
-            [hft.chart :as sut]
-            [hft.dataset :as dataset]) 
-  (:import [org.ta4j.core.indicators.helpers ClosePriceIndicator]
-           [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator IchimokuTenkanSenIndicator]
-           [org.ta4j.core.rules CrossedDownIndicatorRule IsRisingRule]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest is]]
+   [hft.chart :as sut]
+   [hft.strategy :as strategy]) 
+  (:import
+   [org.ta4j.core.indicators.helpers ClosePriceIndicator]
+   [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator IchimokuTenkanSenIndicator]
+   [org.ta4j.core.rules CrossedDownIndicatorRule IsRisingRule]))
 
 (deftest chart-test
   (let [kline {:o 4
@@ -31,7 +33,7 @@
                                         (update :v - (mod %1 20)))))
                     vec)
         ichimoku-period 26
-        series (dataset/klines->series "1m" klines)
+        series (strategy/klines->series "1m" klines)
         close-prices (ClosePriceIndicator. series)
         chikou (IchimokuChikouSpanIndicator. series ichimoku-period)
         tenkan (IchimokuTenkanSenIndicator. series 9)
@@ -39,11 +41,8 @@
         chart (-> (sut/->chart "Buy signal" klines)
                   (sut/with-indicator kijun :overlay :line 0)
                   (sut/with-indicator chikou :overlay :line 1)
-                  (sut/with-indicator tenkan :overlay :line 2))
-        buy-rule-1 (CrossedDownIndicatorRule. chikou close-prices)
-        buy-rule-2 (IsRisingRule. tenkan 2)]
-    (is (= true (.isSatisfied buy-rule-1 (- (count klines) ichimoku-period) nil)))
-    (is (= true (.isSatisfied buy-rule-2 (dec (count klines)) nil)))
+                  (sut/with-indicator tenkan :overlay :line 2))]
+    (is (= 22.0 (.doubleValue (.getValue chikou (- (dec (count klines)) ichimoku-period)))))
     (sut/->image chart "chart.png")
     (is (= true (.exists (io/file "chart.png"))))
-    #_(.delete (io/file "chart.png"))))
+    (.delete (io/file "chart.png"))))

@@ -16,6 +16,7 @@
 (def STOP-LOSS-PRICE-PERCENT 0.003)
 (def TREND-STRENGTH-THRESHOLD 50)
 (def ICHIMOKU-PERIOD 30)
+(def TENKAN-PERIOD 9)
 (def DATAFILE (str SYMBOL ".tsv"))
 (def KLINES-SERIES-LENGTH 110)
 
@@ -70,14 +71,14 @@
       (let [series (klines->series "1m" klines)
             chikou (IchimokuChikouSpanIndicator. series ICHIMOKU-PERIOD)
             kijun (IchimokuKijunSenIndicator. series ICHIMOKU-PERIOD)
-            tenkan (IchimokuTenkanSenIndicator. series 9)
+            tenkan (IchimokuTenkanSenIndicator. series TENKAN-PERIOD)
             close-prices (ClosePriceIndicator. series)
             high-prices (HighPriceIndicator. series)
                         ;; chikou just has crossed the prices up
             buy-signal? (and (> (.doubleValue (.getValue chikou (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD)))
                                 (.doubleValue (.getValue tenkan (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD))))
-                             (< (.doubleValue (.getValue chikou (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1)))
-                                (.doubleValue (.getValue tenkan (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1)))))
+                             (< (.doubleValue (.getValue chikou (+ TENKAN-PERIOD (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1))))
+                                (.doubleValue (.getValue tenkan (+ TENKAN-PERIOD (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1))))))
            ; buy-rule-2 (IsRisingRule. tenkan 2)
             sell-signal? (or
                           ;; kijun just has crossed the prices up
