@@ -78,8 +78,8 @@
             buy-signal? (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
                                 (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
                              (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))
-                                (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))))
-           ; buy-rule-2 (IsRisingRule. tenkan 2)
+                                (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD))))
+                             (.isSatisfied (IsRisingRule. tenkan 2) (- KLINES-SERIES-LENGTH 1) nil))
             sell-signal? (or
                           ;; kijun just has crossed the prices up
                           (and (> (.doubleValue (.getValue kijun (- KLINES-SERIES-LENGTH 1)))
