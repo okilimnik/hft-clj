@@ -42,7 +42,8 @@
                   (sut/with-indicator kijun :overlay :line 0)
                   (sut/with-indicator chikou :overlay :line 1)
                   (sut/with-indicator tenkan :overlay :line 2))]
-    (is (= 22.0 (.doubleValue (.getValue chikou (- (dec (count klines)) ichimoku-period)))))
+    (is (= 22.0 (.doubleValue (.getValue chikou (- (count klines) 1 ichimoku-period)))))
+    ;(is (= 4 (count (mapv #(.doubleValue (.getValue tenkan %)) (range (count klines))))))
     (sut/->image chart "chart.png")
     (is (= true (.exists (io/file "chart.png"))))
     (.delete (io/file "chart.png"))))
