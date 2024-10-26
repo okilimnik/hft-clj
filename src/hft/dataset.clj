@@ -45,6 +45,7 @@
 
 (defn range-market-pipeline []
   (println "SYMBOL is: " SYMBOL)
+  ;(.delete (io/file DATAFILE))
   (.mkdirs (io/file "charts"))
   (.mkdirs (io/file "books"))
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)

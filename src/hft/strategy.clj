@@ -76,9 +76,9 @@
             high-prices (HighPriceIndicator. series)
                         ;; chikou just has crossed the prices up
             buy-signal? (and (> (.doubleValue (.getValue chikou (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD)))
-                                (.doubleValue (.getValue tenkan (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD))))
-                             (< (.doubleValue (.getValue chikou (+ TENKAN-PERIOD (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1))))
-                                (.doubleValue (.getValue tenkan (+ TENKAN-PERIOD (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1))))))
+                                (.doubleValue (.getValue tenkan (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD TENKAN-PERIOD))))
+                             (< (.doubleValue (.getValue chikou (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD 1)))
+                                (.doubleValue (.getValue tenkan (- (dec KLINES-SERIES-LENGTH) ICHIMOKU-PERIOD TENKAN-PERIOD 1)))))
            ; buy-rule-2 (IsRisingRule. tenkan 2)
             sell-signal? (or
                           ;; kijun just has crossed the prices up
