@@ -77,11 +77,9 @@
                                                     data (:data event)]
                                                 (cond
 
-                                                  (and (= (:stream event) klines-1m)
-                                                       ;; kline closed
-                                                       (:x (:k data)))
-                                                  (let [kline (:k data)]
-                                                    (swap! klines #(as-> % $
+                                                  (= (:stream event) klines-1m)
+                                                  (let [kline (:k data)
+                                                        new-klines (as-> @klines $
                                                                      (conj $ (-> kline
                                                                                  (select-keys [:t :o :h :l :c :v :n])
                                                                                  (update :o parse-double)
@@ -91,8 +89,10 @@
                                                                                  (update :v parse-double)))
                                                                      (if (> (count $) KLINES-SERIES-LENGTH)
                                                                        (pop $)
-                                                                       $)))
-                                                    (strategy/trade! {:klines @klines
+                                                                       $))]
+                                                    (when (:x (:k data)) ;; kline closed
+                                                      (reset! klines new-klines))
+                                                    (strategy/trade! {:klines new-klines
                                                                       :inputs @inputs}))))
                                               (catch Exception e (prn e))))))))
 
