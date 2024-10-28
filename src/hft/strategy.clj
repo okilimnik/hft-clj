@@ -74,12 +74,23 @@
             tenkan (IchimokuTenkanSenIndicator. series TENKAN-PERIOD)
             close-prices (ClosePriceIndicator. series)
             high-prices (HighPriceIndicator. series)
-                        ;; chikou just has crossed the prices up
-            buy-signal? (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
-                                (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
-                             (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))
-                                (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD))))
-                             (.isSatisfied (IsRisingRule. tenkan 2) (- KLINES-SERIES-LENGTH 1) nil))
+                        
+            buy-signal? (or 
+                         ;; chikou just has crossed the tenkan up
+                         (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
+                                 (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
+                              (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))
+                                 (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD))))
+                              ;; and it's trendy a bit
+                              (.isSatisfied (IsRisingRule. tenkan 2) (- KLINES-SERIES-LENGTH 1) nil))
+                         ;; chikou just has crossed the high prices up
+                         (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
+                                 (.doubleValue (.getValue high-prices (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
+                              (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))
+                                 (.doubleValue (.getValue high-prices (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD))))
+                              ;; and it's trendy a bit
+                              (.isSatisfied (IsRisingRule. tenkan 2) (- KLINES-SERIES-LENGTH 1) nil)))
+
             sell-signal? (or
                           ;; kijun just has crossed the prices up
                           (and (> (.doubleValue (.getValue kijun (- KLINES-SERIES-LENGTH 1)))
