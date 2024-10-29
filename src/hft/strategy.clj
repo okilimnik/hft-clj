@@ -1,12 +1,14 @@
 (ns hft.strategy
-  (:require [clojure.string :as str]
-            [hft.chart :as chart]
-            [hft.image :as i])
-  (:import [java.time Instant ZoneId ZonedDateTime]
-           [org.ta4j.core BarSeries BaseBarSeries]
-           [org.ta4j.core.indicators.helpers ClosePriceIndicator HighPriceIndicator]
-           [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator IchimokuTenkanSenIndicator]
-           [org.ta4j.core.rules CrossedDownIndicatorRule CrossedUpIndicatorRule IsRisingRule]))
+  (:require
+   [clojure.string :as str]
+   [hft.chart :as chart]
+   [hft.image :as i])
+  (:import
+   [java.time Instant ZoneId ZonedDateTime]
+   [org.ta4j.core BarSeries BaseBarSeries]
+   [org.ta4j.core.indicators.helpers ClosePriceIndicator HighPriceIndicator LowPriceIndicator]
+   [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator IchimokuTenkanSenIndicator]
+   [org.ta4j.core.rules IsRisingRule]))
 
 (def order (atom nil))
 (def SYMBOL (or (System/getenv "SYMBOL") "BTCUSDT"))
@@ -73,23 +75,26 @@
             kijun (IchimokuKijunSenIndicator. series ICHIMOKU-PERIOD)
             tenkan (IchimokuTenkanSenIndicator. series TENKAN-PERIOD)
             close-prices (ClosePriceIndicator. series)
+            low-prices (LowPriceIndicator. series)
             high-prices (HighPriceIndicator. series)
-                        
-            buy-signal? (or 
+
+            buy-signal? (and
+                         ;; and it's trendy a bit
+                         (.isSatisfied (IsRisingRule. tenkan 2) (- KLINES-SERIES-LENGTH 1) nil)
+                         ;; bullishly
+                         (< (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1)))
+                            (.doubleValue (.getValue low-prices (- KLINES-SERIES-LENGTH 1))))
+                         (or
                          ;; chikou just has crossed the tenkan up
-                         (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
-                                 (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
-                              (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))
-                                 (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD))))
-                              ;; and it's trendy a bit
-                              (.isSatisfied (IsRisingRule. tenkan 2) (- KLINES-SERIES-LENGTH 1) nil))
+                          (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
+                                  (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
+                               (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))
+                                  (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))))
                          ;; chikou just has crossed the high prices up
-                         (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
-                                 (.doubleValue (.getValue high-prices (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
-                              (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))
-                                 (.doubleValue (.getValue high-prices (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD))))
-                              ;; and it's trendy a bit
-                              (.isSatisfied (IsRisingRule. tenkan 2) (- KLINES-SERIES-LENGTH 1) nil)))
+                          (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
+                                  (.doubleValue (.getValue high-prices (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
+                               (< (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))
+                                  (.doubleValue (.getValue high-prices (- KLINES-SERIES-LENGTH 2 ICHIMOKU-PERIOD)))))))
 
             sell-signal? (or
                           ;; kijun just has crossed the prices up
