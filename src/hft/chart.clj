@@ -80,6 +80,8 @@
     "IchimokuChikouSpanIndicator" Color/GREEN
     "IchimokuKijunSenIndicator" Color/RED
     "IchimokuTenkanSenIndicator" Color/BLUE
+    "IchimokuSenkouSpanAIndicator" Color/BLACK
+    "IchimokuSenkouSpanBIndicator" Color/BLACK
     Color/BLACK))
 
 (defn with-indicator [chart indicator plot-type chart-type overlay-id]
