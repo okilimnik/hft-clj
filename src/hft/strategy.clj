@@ -7,7 +7,12 @@
    [java.time Instant ZoneId ZonedDateTime]
    [org.ta4j.core BarSeries BaseBarSeries]
    [org.ta4j.core.indicators.helpers ClosePriceIndicator HighPriceIndicator LowPriceIndicator]
-   [org.ta4j.core.indicators.ichimoku IchimokuChikouSpanIndicator IchimokuKijunSenIndicator IchimokuTenkanSenIndicator]
+   [org.ta4j.core.indicators.ichimoku
+    IchimokuChikouSpanIndicator
+    IchimokuKijunSenIndicator
+    IchimokuSenkouSpanAIndicator
+    IchimokuSenkouSpanBIndicator
+    IchimokuTenkanSenIndicator]
    [org.ta4j.core.rules IsRisingRule]))
 
 (def order (atom nil))
@@ -74,11 +79,15 @@
             chikou (IchimokuChikouSpanIndicator. series ICHIMOKU-PERIOD)
             kijun (IchimokuKijunSenIndicator. series ICHIMOKU-PERIOD)
             tenkan (IchimokuTenkanSenIndicator. series TENKAN-PERIOD)
+            senkou-span-a (IchimokuSenkouSpanAIndicator. series TENKAN-PERIOD ICHIMOKU-PERIOD)
+            senkou-span-b (IchimokuSenkouSpanBIndicator. series (* ICHIMOKU-PERIOD 2) ICHIMOKU-PERIOD)
             close-prices (ClosePriceIndicator. series)
             low-prices (LowPriceIndicator. series)
             high-prices (HighPriceIndicator. series)
 
             buy-signal? (and
+                         (> price (.doubleValue (.getValue senkou-span-a (- KLINES-SERIES-LENGTH 1))))
+                         (> price (.doubleValue (.getValue senkou-span-b (- KLINES-SERIES-LENGTH 1))))
                          ;; and it's trendy a bit
                          (.isSatisfied (IsRisingRule. tenkan 2) (- KLINES-SERIES-LENGTH 1) nil)
                          ;; bullishly
