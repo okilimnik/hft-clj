@@ -85,6 +85,11 @@
                          (< (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1)))
                             (.doubleValue (.getValue low-prices (- KLINES-SERIES-LENGTH 1))))
                          (or
+                          ;; tenkan just has crossed the kijun up
+                          (and (> (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1)))
+                                  (.doubleValue (.getValue kijun (- KLINES-SERIES-LENGTH 1))))
+                               (< (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 2)))
+                                  (.doubleValue (.getValue kijun (- KLINES-SERIES-LENGTH 2)))))
                          ;; chikou just has crossed the tenkan up
                           (and (> (.doubleValue (.getValue chikou (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD)))
                                   (.doubleValue (.getValue tenkan (- KLINES-SERIES-LENGTH 1 ICHIMOKU-PERIOD))))
