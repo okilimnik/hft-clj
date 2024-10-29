@@ -124,8 +124,8 @@
                 (let [chart (-> (chart/->chart "Buy signal" klines)
                                 (chart/with-indicator chikou :overlay :line 0)
                                 (chart/with-indicator kijun :overlay :line 1)
-                                (chart/with-indicator senkou-span-a :overlay :line 3)
-                                (chart/with-indicator senkou-span-b :overlay :line 4))]
+                                (chart/with-indicator senkou-span-a :overlay :line 2)
+                                (chart/with-indicator senkou-span-b :overlay :line 3))]
                   (open-order price inputs chart))))
 
           sell-signal?
