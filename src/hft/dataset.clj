@@ -33,6 +33,16 @@
 (defn get-max-price [mid-price]
   (+ mid-price (* mid-price PRICE-PERCENT-FOR-INDEXING (/ INPUT-SIZE 2))))
 
+(defn get-levels-with-max-qty-sorted [prices]
+  (->> (map-indexed vector prices)
+       (sort-by second >)
+       (map first)
+       (take 3)
+       vec))
+
+(defn get-distance-from-terminator [prices terminator]
+  (abs (- (first (get-levels-with-max-qty-sorted prices)) terminator)))
+
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
         min-price (get-min-price mid-price)
@@ -41,7 +51,8 @@
         bids (get-image-column min-price max-price price-interval (:bids order-book))
         asks (get-image-column min-price max-price price-interval (:asks order-book))]
     {:bids bids
-     :asks asks}))
+     :asks asks
+     :max-ask-distance (get-distance-from-terminator asks 10)}))
 
 (defn range-market-pipeline []
   (println "SYMBOL is: " SYMBOL)
@@ -89,11 +100,13 @@
                                                                                  (update :v parse-double)))
                                                                      (if (> (count $) KLINES-SERIES-LENGTH)
                                                                        (pop $)
-                                                                       $))]
+                                                                       $))
+                                                        price-level-size (* PRICE-PERCENT-FOR-INDEXING (:c (last new-klines)))]
                                                     (when (:x (:k data)) ;; kline closed
                                                       (reset! klines new-klines))
                                                     (strategy/trade! {:klines new-klines
-                                                                      :inputs @inputs}))))
+                                                                      :inputs @inputs
+                                                                      :price-level-size price-level-size}))))
                                               (catch Exception e (prn e))))))))
 
        (scheduler/start!
