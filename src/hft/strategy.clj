@@ -73,9 +73,11 @@
             close-prices (ClosePriceIndicator. series)
             rsi (RSIIndicator. close-prices 15)
             max-ask-distance (:max-ask-distance (last inputs))
+            max-bid-distance (:max-bid-distance (last inputs))
 
             buy-signal? (and
                          (> max-ask-distance 2)
+                         (< max-bid-distance 2)
                          (< 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 1))))
                          (>= 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 2)))))]
 
