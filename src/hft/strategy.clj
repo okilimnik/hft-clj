@@ -83,6 +83,6 @@
           (prn "buy signal")
           (when-not @order
             (let [chart (-> (chart/->chart "Buy signal" klines)
-                            (chart/with-indicator rsi :overlay :line 0))
+                            (chart/with-indicator rsi :subplot :line 0))
                   stop-profit-price (+ price (* price-level-size max-ask-distance))]
               (open-order price stop-profit-price inputs chart))))))))

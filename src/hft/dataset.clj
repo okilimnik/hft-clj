@@ -36,12 +36,11 @@
 (defn get-levels-with-max-qty-sorted [prices]
   (->> (map-indexed vector prices)
        (sort-by second >)
-       (map first)
        (take 3)
        vec))
 
 (defn get-distance-from-terminator [prices terminator]
-  (abs (- (first (get-levels-with-max-qty-sorted prices)) terminator)))
+  (abs (- (ffirst (get-levels-with-max-qty-sorted prices)) terminator)))
 
 (defn order-book->quantities-indexed-by-price-level [order-book max-bid]
   (let [mid-price max-bid
@@ -52,7 +51,10 @@
         asks (get-image-column min-price max-price price-interval (:asks order-book))]
     {:bids bids
      :asks asks
-     :max-ask-distance (get-distance-from-terminator asks 10)}))
+     :max-ask (second (first (get-levels-with-max-qty-sorted asks)))
+     :max-bid (second (first (get-levels-with-max-qty-sorted bids)))
+     :max-ask-distance (get-distance-from-terminator asks 10)
+     :max-bid-distance (get-distance-from-terminator bids 9)}))
 
 (defn range-market-pipeline []
   (println "SYMBOL is: " SYMBOL)
