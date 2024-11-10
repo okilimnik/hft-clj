@@ -79,12 +79,19 @@
                          (> max-ask-distance 2)
                          (< max-bid-distance 2)
                          (< 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 1))))
-                         (>= 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 2)))))]
+                         (>= 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 2)))))
 
-        (when buy-signal?
-          (prn "buy signal")
-          (when-not @order
-            (let [chart (-> (chart/->chart "Buy signal" klines)
-                            (chart/with-indicator rsi :subplot :line 0))
-                  stop-profit-price (+ price (* price-level-size max-ask-distance))]
-              (open-order price stop-profit-price inputs chart))))))))
+            sell-signal? (and
+                          (>= price (+ price (/ (* price-level-size max-ask-distance) 10)))
+                          (> 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 1))))
+                          (<= 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 2)))))]
+
+        (cond
+          (and buy-signal? (not @order))
+          (do (prn "buy signal")
+              (let [chart (-> (chart/->chart "Buy signal" klines)
+                              (chart/with-indicator rsi :subplot :line 0))
+                    stop-profit-price (+ price (* price-level-size max-ask-distance))]
+                (open-order price stop-profit-price inputs chart)))
+          (and sell-signal? @order)
+          (close-order price))))))
