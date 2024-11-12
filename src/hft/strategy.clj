@@ -81,7 +81,7 @@
                          (< 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 1))))
                          (>= 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 2)))))
 
-            sell-signal? (and
+            sell-signal? false #_(and
                           (>= price (+ price (/ (* price-level-size max-ask-distance) 10)))
                           (> 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 1))))
                           (<= 50 (.doubleValue (.getValue rsi (- KLINES-SERIES-LENGTH 2)))))]
