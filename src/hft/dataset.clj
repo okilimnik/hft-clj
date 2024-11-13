@@ -1,13 +1,18 @@
 (ns hft.dataset
-  (:require [clojure.core.async :as a :refer [<!! thread]]
-            [clojure.java.io :as io]
-            [clojure.set :as set]
-            [clojure.string :as str]
-            [hft.gcloud :as gcloud]
-            [hft.market.binance :as bi]
-            [hft.scheduler :as scheduler]
-            [hft.strategy :as strategy :refer [DATAFILE KLINES-SERIES-LENGTH SYMBOL]])
-  (:import [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
+  (:require
+   [clojure.core.async :as a :refer [<!! thread]]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [hft.chart :as chart]
+   [hft.gcloud :as gcloud]
+   [hft.market.binance :as bi]
+   [hft.scheduler :as scheduler]
+   [hft.strategy :as strategy :refer [DATAFILE klines->series
+                                      KLINES-SERIES-LENGTH SYMBOL]])
+  (:import
+   [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
+   [org.ta4j.core.indicators RSIIndicator]
+   [org.ta4j.core.indicators.helpers ClosePriceIndicator]))
 
 ;; ["BNBUSDT" "BTCUSDT" "ETHUSDT" "SOLUSDT" "PEPEUSDT" "NEIROUSDT" "DOGSUSDT" "WIFUSDT" "FETUSDT" "SAGAUSDT"]
 
@@ -56,7 +61,7 @@
      :max-ask-distance (get-distance-from-terminator asks 10)
      :max-bid-distance (get-distance-from-terminator bids 9)}))
 
-(defn range-market-pipeline []
+(defn range-market-pipeline [{:keys [on-update]}]
   (println "SYMBOL is: " SYMBOL)
   ;(.delete (io/file DATAFILE))
   (.mkdirs (io/file "charts"))
@@ -108,7 +113,17 @@
                                                       (reset! klines new-klines))
                                                     (strategy/trade! {:klines new-klines
                                                                       :inputs @inputs
-                                                                      :price-level-size price-level-size}))))
+                                                                      :price-level-size price-level-size})
+                                                    ;; update ui
+                                                    (when (and on-update (>= (count new-klines) KLINES-SERIES-LENGTH))
+                                                      (let [series (klines->series "1m" klines)
+                                                            close-prices (ClosePriceIndicator. series)
+                                                            rsi (RSIIndicator. close-prices 15)
+                                                            chart (-> (chart/->chart "Buy signal" klines)
+                                                                      (chart/with-indicator rsi :subplot :line 0))
+                                                            chart-path (str "charts/chart.png")]
+                                                        (chart/->image chart chart-path)
+                                                        (on-update {:chart chart-path}))))))
                                               (catch Exception e (prn e))))))))
 
        (scheduler/start!

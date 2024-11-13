@@ -1,9 +1,8 @@
 (ns hft.core
   (:gen-class)
-  (:require [clojure.tools.cli :refer [parse-opts]] ;[hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
+  (:require [clojure.tools.cli :refer [parse-opts]]
             [hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
-            [hft.model.lightgbm :as lightgbm])
-  (:import [io.helidon.webserver WebServer]))
+            [hft.model.lightgbm :as lightgbm]))
 
 (def cli-options
   ;; An option with a required argument
@@ -24,28 +23,18 @@
    ;; A boolean option defaulting to nil
    ["-h" "--help"]])
 
-(defn run-server []
-  (-> (.build (doto (WebServer/builder)
-                (.port 80)
-                (.routing (fn [this]
-                            (.get this "/orderBook" (fn [req res]
-                                                      (.send res "Hello World!")))))))
-      (.start)))
-
 (defn -main [& args]
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
         market-state (or (System/getenv "MARKET_STATE") "range")]
 
     (cond
-      (:order-book options)
-      (do (run-server))
       (:train options) (do (lightgbm/train!)
                            (System/exit 0))
       :else
       (do
         (println "market state is: " market-state)
         (case (keyword market-state)
-          :range (range-market-pipeline)
+          :range (range-market-pipeline {})
           :trend (trend-market-pipeline)
           (prn (str "Handling " market-state " market is not implemented")))))))
 

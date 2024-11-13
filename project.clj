@@ -13,7 +13,6 @@
                  [io.github.binance/binance-connector-java "3.2.0"]
                  [org.ta4j/ta4j-core "0.16"]
                  [com.google.cloud/google-cloud-storage "2.43.1"]
-                 [io.helidon.webserver/helidon-webserver "4.1.1"]
                  [jfree/jfreechart "1.0.13"]]
   :main hft.core
   :uberjar-name "hft.jar"
