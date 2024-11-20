@@ -13,7 +13,9 @@
                  [io.github.binance/binance-connector-java "3.2.0"]
                  [org.ta4j/ta4j-core "0.16"]
                  [com.google.cloud/google-cloud-storage "2.43.1"]
-                 [jfree/jfreechart "1.0.13"]]
+                 [jfree/jfreechart "1.0.13"]
+                 ;[com.xtdb/xtdb-core "1.24.3"]
+                 [com.xtdb/xtdb-google-cloud-storage "1.24.3"]]
   :main hft.core
   :uberjar-name "hft.jar"
   :profiles {:uberjar {:aot :all}})

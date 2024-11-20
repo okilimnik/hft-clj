@@ -2,15 +2,11 @@
   (:gen-class)
   (:require [clojure.tools.cli :refer [parse-opts]]
             [hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
-            [hft.model.lightgbm :as lightgbm]))
+            [hft.model.lightgbm :as lightgbm]
+            [hft.xtdb :as db]))
 
 (def cli-options
-  ;; An option with a required argument
-  [["-p" "--port PORT" "Port number"
-    :default 80
-    :parse-fn #(Integer/parseInt %)
-    :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
-   ["-t" nil "Train"
+  [["-t" nil "Train"
     :id :train]
    ["-i" nil "UI"
     :id :ui]
@@ -24,6 +20,7 @@
    ["-h" "--help"]])
 
 (defn -main [& args]
+  (db/init)
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
         market-state (or (System/getenv "MARKET_STATE") "range")]
 
@@ -38,3 +35,4 @@
           :trend (trend-market-pipeline)
           (prn (str "Handling " market-state " market is not implemented")))))))
 
+;; GOOGLE_APPLICATION_CREDENTIALS=gcp.json lein run
