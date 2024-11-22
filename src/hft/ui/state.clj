@@ -5,7 +5,6 @@
 (def initial-app-state
   {:chart nil})
 
-
 (def *window
   "State of the main window. Gets set on app startup."
   (atom nil))
@@ -23,8 +22,3 @@
   ;; redraw if the window has already been created in either
   ;; user/-main or the app -main
   (some-> *window deref window/request-frame))
-
-
-(defn update-chart [{:keys [chart]}]
-  (swap! *app assoc :chart chart)
-  (redraw!))

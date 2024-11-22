@@ -1,5 +1,6 @@
 (ns hft.xtdb
-  (:require [xtdb.api :as xt]))
+  (:require [xtdb.api :as xt]
+            [clojure.string :as str]))
 
 (def node (atom nil))
 
@@ -13,8 +14,15 @@
                                                                                     :bucket "neusa-datasets",
                                                                                     :prefix "xtdb-indices/"}}}}})))
 
+(defn gen-id [& parts]
+  (str/join "-" (concat parts [(System/currentTimeMillis)])))
+
 (defn put! [& docs]
   (when-not @node (init))
   (xt/submit-tx @node (for [doc docs]
                         [:xtdb.api/put doc]))
   (xt/sync @node))
+
+(defn q [q & args]
+  (when-not @node (init))
+  (apply (partial xt/q (xt/db @node) q) args))

@@ -1,9 +1,12 @@
 (ns ^{:skip-aot true} hft.ui
-  (:require [clojure.java.io :as io]
-            [clojure.core.async :refer [thread]]
-            [io.github.humbleui.ui :as ui]
-            [hft.ui.state :as state]
-            [hft.dataset :as dataset]))
+  (:require
+   [clojure.core.async :refer [<!! thread timeout]]
+   [clojure.java.io :as io]
+   [hft.dataset :refer [FETCH-INTERVAL-SECONDS INPUT-SIZE]]
+   [hft.strategy :refer [SYMBOL]]
+   [hft.ui.events :refer [update-order-book]]
+   [hft.ui.state :as state]
+   [io.github.humbleui.ui :as ui]))
 
 
 (def root
@@ -16,10 +19,16 @@
                    (ui/image chart))
                   (ui/label "Warming..."))))))
 
+(defn fetch-data! []
+  (thread
+    (loop []
+      (update-order-book {:symbol SYMBOL
+                          :limit INPUT-SIZE})
+      (<!! (timeout (* FETCH-INTERVAL-SECONDS 1000)))
+      (recur))))
 
 (defn -main [& args]
-  (thread
-    (dataset/range-market-pipeline {:on-update state/update-chart}))
+  (fetch-data!)
   (ui/start-app!
    (reset! state/*window
            (ui/window

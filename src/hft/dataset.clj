@@ -88,7 +88,8 @@
                                (pop $)
                                $)))
             (when (= (count @inputs) INPUT-SIZE)
-              (db/put! {:xt/id (str SYMBOL "-" FETCH-INTERVAL-SECONDS "-" INPUT-SIZE "-" (System/currentTimeMillis))
+              (db/put! {:xt/id (db/gen-id [SYMBOL FETCH-INTERVAL-SECONDS INPUT-SIZE])
+                        :order-book/timestamp (System/currentTimeMillis)
                         :order-book/symbol SYMBOL
                         :order-book/bids (vec
                                           (map-indexed (fn [level volume]
