@@ -1,7 +1,7 @@
 (ns hft.core
   (:gen-class)
   (:require [clojure.tools.cli :refer [parse-opts]]
-            [hft.dataset :refer [range-market-pipeline trend-market-pipeline]]
+            [hft.dataset :refer [pipeline]]
             [hft.model.lightgbm :as lightgbm]
             [hft.xtdb :as db]))
 
@@ -28,11 +28,6 @@
       (:train options) (do (lightgbm/train!)
                            (System/exit 0))
       :else
-      (do
-        (println "market state is: " market-state)
-        (case (keyword market-state)
-          :range (range-market-pipeline {})
-          :trend (trend-market-pipeline)
-          (prn (str "Handling " market-state " market is not implemented")))))))
+      (pipeline {}))))
 
-;; GOOGLE_APPLICATION_CREDENTIALS=gcp.json lein run
+;; GOOGLE_APPLICATION_CREDENTIALS=gcp.json clj -M -m hft.core

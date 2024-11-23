@@ -1,25 +1,19 @@
 (ns hft.dataset
   (:require
    [clojure.core.async :as a :refer [<!! thread]]
-   [clojure.java.io :as io]
    [clojure.string :as str]
-   [hft.chart :as chart]
-   [hft.gcloud :as gcloud]
    [hft.market.binance :as bi]
    [hft.xtdb :as db]
    [hft.scheduler :as scheduler]
-   [hft.strategy :as strategy :refer [DATAFILE klines->series
-                                      KLINES-SERIES-LENGTH SYMBOL]])
+   [hft.strategy :as strategy :refer [SYMBOL]])
   (:import
-   [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
-   [org.ta4j.core.indicators RSIIndicator]
-   [org.ta4j.core.indicators.helpers ClosePriceIndicator]))
+   [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
 
 ;; ["BNBUSDT" "BTCUSDT" "ETHUSDT" "SOLUSDT" "PEPEUSDT" "NEIROUSDT" "DOGSUSDT" "WIFUSDT" "FETUSDT" "SAGAUSDT"]
 
 (def INPUT-SIZE 20)
 (def PRICE-PERCENT-FOR-INDEXING 0.002)
-(def FETCH-INTERVAL-SECONDS 6)
+(def FETCH-INTERVAL-SECONDS 5)
 
 (defn get-image-column [min-price max-price price-interval prices]
   (loop [prices prices
@@ -63,30 +57,44 @@
      :max-ask-distance (get-distance-from-terminator asks 10)
      :max-bid-distance (get-distance-from-terminator bids 9)}))
 
-(defn range-market-pipeline [{:keys [on-update]}]
+(defn pipeline [{:keys [on-update]}]
   (println "SYMBOL is: " SYMBOL)
-  ;(.delete (io/file DATAFILE))
-  (.mkdirs (io/file "charts"))
-  (.mkdirs (io/file "books"))
   (let [inputs (atom clojure.lang.PersistentQueue/EMPTY)
         max-bids (atom clojure.lang.PersistentQueue/EMPTY)
-        klines (atom clojure.lang.PersistentQueue/EMPTY)]
+        depth-cache (atom clojure.lang.PersistentQueue/EMPTY)
+        order-book (atom nil)]
     (<!!
      (a/merge
       [(scheduler/start!
+        60000
+        (fn []
+          (reset! order-book (-> (bi/depth! SYMBOL 5000)
+                                 (update :bids #(into {} %))
+                                 (update :asks #(into {} %))))
+          (doseq [depth @depth-cache]
+            (when (> (:lastUpdateId @order-book) (:u depth))
+              (swap! order-book #(-> %
+                                     (update :bids merge (into {} (:b depth)))
+                                     (update :asks merge (into {} (:a depth)))))))))
+       (scheduler/start!
         (* 1000 FETCH-INTERVAL-SECONDS)
         (fn []
-          (let [order-book (bi/depth! SYMBOL 5000)]
-            (swap! max-bids #(as-> % $
-                               (conj $ (parse-double (ffirst (:bids order-book))))
+          (when @order-book
+            (let [order-book' (-> @order-book
+                                  (update :bids #(->> (into [] %)
+                                                      (sort-by (comp parse-double first) >)))
+                                  (update :asks #(->> (into [] %)
+                                                      (sort-by (comp parse-double first) <))))]
+              (swap! max-bids #(as-> % $
+                                 (conj $ (parse-double (ffirst (:bids order-book'))))
+                                 (if (> (count $) INPUT-SIZE)
+                                   (pop $)
+                                   $)))
+              (swap! inputs #(as-> % $
+                               (conj $ (order-book->quantities-indexed-by-price-level order-book' (apply max @max-bids)))
                                (if (> (count $) INPUT-SIZE)
                                  (pop $)
-                                 $)))
-            (swap! inputs #(as-> % $
-                             (conj $ (order-book->quantities-indexed-by-price-level order-book (apply max @max-bids)))
-                             (if (> (count $) INPUT-SIZE)
-                               (pop $)
-                               $)))
+                                 $))))
             (when (= (count @inputs) INPUT-SIZE)
               (db/put! {:xt/id (db/gen-id [SYMBOL FETCH-INTERVAL-SECONDS INPUT-SIZE])
                         :order-book/timestamp (System/currentTimeMillis)
@@ -101,63 +109,27 @@
                                                          {:price/level level
                                                           :price/quantity volume})
                                                        (-> @inputs last :asks)))})))))
-       #_(thread
-           (let [klines-1m (str (str/lower-case SYMBOL) "@kline_1m")]
-             (bi/subscribe [klines-1m]
+       (thread
+         (try
+           (let [depth (str (str/lower-case SYMBOL) "@depth")]
+             (bi/subscribe [depth]
                            (reify WebSocketMessageCallback
                              ^void (onMessage [_ event-str]
-                                              (try
-                                                (let [event (bi/jread event-str)
-                                                      data (:data event)]
-                                                  (cond
 
-                                                    (= (:stream event) klines-1m)
-                                                    (let [kline (:k data)
-                                                          new-klines (as-> @klines $
-                                                                       (conj $ (-> kline
-                                                                                   (select-keys [:t :o :h :l :c :v :n])
-                                                                                   (update :o parse-double)
-                                                                                   (update :h parse-double)
-                                                                                   (update :l parse-double)
-                                                                                   (update :c parse-double)
-                                                                                   (update :v parse-double)))
-                                                                       (if (> (count $) KLINES-SERIES-LENGTH)
-                                                                         (pop $)
-                                                                         $))
-                                                          price-level-size (* PRICE-PERCENT-FOR-INDEXING (:c (last new-klines)))]
-                                                      (when (:x (:k data)) ;; kline closed
-                                                        (reset! klines new-klines))
-                                                      #_(strategy/trade! {:klines new-klines
-                                                                          :inputs @inputs
-                                                                          :price-level-size price-level-size})
-                                                    ;; update ui
-                                                      #_(when (and on-update (>= (count new-klines) KLINES-SERIES-LENGTH))
-                                                          (let [series (klines->series "1m" klines)
-                                                                close-prices (ClosePriceIndicator. series)
-                                                                rsi (RSIIndicator. close-prices 15)
-                                                                chart (-> (chart/->chart "Buy signal" klines)
-                                                                          (chart/with-indicator rsi :subplot :line 0))
-                                                                chart-path (str "charts/chart.png")]
-                                                            (chart/->image chart chart-path)
-                                                            (on-update {:chart chart-path}))))))
-                                                (catch Exception e (prn e))))))))
-
-       (scheduler/start!
-        (* 1 60 60 1000) ;; every 1 hour
-        (fn []
-          (let [f (io/file DATAFILE)]
-            (prn "checking data file")
-            (when (.exists f)
-              (prn "uploading data file")
-              (gcloud/upload-file! f)))
-          (doseq [f (file-seq (io/file "charts"))]
-            (when-not (.isDirectory f)
-              (gcloud/upload-file! f)
-              (.delete f)))
-          (doseq [f (file-seq (io/file "books"))]
-            (when-not (.isDirectory f)
-              (gcloud/upload-file! f)
-              (.delete f)))))]))))
-
-(defn trend-market-pipeline []
-  (println "SYMBOL is: " SYMBOL))
+                                              (let [event (bi/jread event-str)
+                                                    data (:data event)]
+                                                (cond
+                                                  (= (:stream event) depth)
+                                                  (do
+                                                    (swap! depth-cache #(as-> % $
+                                                                          (conj $ data)
+                                                                          (if (> (count $) 50)
+                                                                            (pop $)
+                                                                            $)))
+                                                    (when @order-book
+                                                      (doseq [depth @depth-cache]
+                                                        (when (> (:lastUpdateId @order-book) (:u depth))
+                                                          (swap! order-book #(-> %
+                                                                                 (update :bids merge (into {} (:b depth)))
+                                                                                 (update :asks merge (into {} (:a depth)))))))))))))))
+           (catch Exception e (prn e))))]))))
