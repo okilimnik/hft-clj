@@ -3,7 +3,8 @@
   (:require [clojure.tools.cli :refer [parse-opts]]
             [hft.dataset :refer [pipeline]]
             [hft.model.lightgbm :as lightgbm]
-            [hft.xtdb :as db]))
+            [hft.xtdb :as db]
+            [hft.model.ea]))
 
 (def cli-options
   [["-t" nil "Train"
