@@ -1,18 +1,13 @@
 (ns hft.model.ea
+  (:require [hft.interop :refer [as-function]])
   (:import [io.jenetics BitChromosome Genotype]
-           [io.jenetics.engine Engine EvolutionResult]
-           [java.util.function Function]))
+           [io.jenetics.engine Engine EvolutionResult]))
 
 (defn eval! [gt]
   (-> gt
       (.chromosome)
       (.as BitChromosome)
       (.bitCount)))
-
-(defn as-function [f]
-  (reify Function
-    (apply [_this arg]
-      (f arg))))
 
 (defn start []
   (let [gtf (Genotype/of [(BitChromosome/of 10 0.5)])
